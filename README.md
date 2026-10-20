@@ -139,3 +139,11 @@ npm run lint    # 程式碼檢查
 npm run build   # 型別檢查 + 打包到 dist/
 npm run preview # 預覽正式版（含 CSP 與 service worker）
 ```
+
+## 部署
+
+[.github/workflows/deploy_pages.yml](.github/workflows/deploy_pages.yml)：push 到 `main` 後，GitHub Actions 會自動 `npm ci` → `lint` → `build`，並把 `dist/` 發布到 GitHub Pages。
+
+- 網址：https://eat-apple-again.github.io/portfolio_dashboard/
+- 首次設定：repo **Settings → Pages → Source 選「GitHub Actions」**
+- 權限最小化：workflow 只有讀取程式碼與發布 Pages 的權限
