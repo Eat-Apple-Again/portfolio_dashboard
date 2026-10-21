@@ -64,3 +64,11 @@ export function fmt_time(ms: number | null): string {
     hour12: false,
   })
 }
+
+/** '' -> null, invalid -> NaN; commas allowed */
+export function parse_num(s: string): number | null {
+  const t = s.replace(/,/g, '').trim()
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) ? n : NaN
+}

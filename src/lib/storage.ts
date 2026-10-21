@@ -2,6 +2,8 @@ import type { Credentials } from '../types'
 
 const CREDENTIALS_KEY = 'portfolio_dashboard_credentials'
 const HIDE_AMOUNTS_KEY = 'portfolio_dashboard_hide_amounts'
+// Legacy key from an earlier version; still cleared on logout
+const PREFS_KEY = 'portfolio_dashboard_prefs'
 
 // Only accept Apps Script web app URLs so the token can never be sent to another host
 const API_URL_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/
@@ -33,6 +35,7 @@ export function save_credentials(credentials: Credentials): void {
 export function clear_credentials(): void {
   try {
     localStorage.removeItem(CREDENTIALS_KEY)
+    localStorage.removeItem(PREFS_KEY)
   } catch {
     // ignore
   }
@@ -49,6 +52,29 @@ export function load_hide_amounts(): boolean {
 export function save_hide_amounts(hide: boolean): void {
   try {
     localStorage.setItem(HIDE_AMOUNTS_KEY, hide ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
+
+const COLLAPSED_KEY = 'portfolio_dashboard_collapsed'
+
+/** Which dashboard sections are collapsed (UI only, no asset data) */
+export function load_collapsed(id: string): boolean {
+  try {
+    const ids = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as string[]
+    return ids.includes(id)
+  } catch {
+    return false
+  }
+}
+
+export function save_collapsed(id: string, collapsed: boolean): void {
+  try {
+    const ids = new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as string[])
+    if (collapsed) ids.add(id)
+    else ids.delete(id)
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]))
   } catch {
     // ignore
   }

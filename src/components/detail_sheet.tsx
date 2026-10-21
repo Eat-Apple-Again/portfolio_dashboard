@@ -15,7 +15,6 @@ interface Props {
 export function DetailSheet({ position: p, hide, on_close }: Props) {
   const h = p.holding
   const cur = h.currency
-  const is_cash = h.type === 'CASH'
 
   useEffect(() => {
     const on_key = (e: KeyboardEvent) => e.key === 'Escape' && on_close()
@@ -44,39 +43,30 @@ export function DetailSheet({ position: p, hide, on_close }: Props) {
         </div>
 
         <dl className="mt-5 divide-y divide-slate-800 text-sm">
-          {is_cash ? (
+          <Row label={`現價（${cur}）`}>{fmt_price(p.price)}</Row>
+          <Row label="今日漲跌">
+            <span className={pnl_color(p.day_change_pct)}>{fmt_pct(p.day_change_pct)}</span>
+          </Row>
+          <Row label="數量">{fmt_qty(h.quantity, hide)}</Row>
+          <Row label={`平均成本（${cur}）`}>{fmt_price(h.avg_cost)}</Row>
+          <Row label={`總成本（${cur}）`}>{fmt_money(p.cost, cur, hide)}</Row>
+          <Row label={`現值（${cur}）`}>{fmt_money(p.value, cur, hide)}</Row>
+          <Row label={`未實現損益（${cur}）`}>
+            <span className={pnl_color(p.pnl)}>
+              {fmt_signed_money(p.pnl, cur, hide)}（{fmt_pct(p.pnl_pct)}）
+            </span>
+          </Row>
+          {cur !== 'TWD' && (
             <>
-              <Row label={`餘額（${cur}）`}>{fmt_money(p.value, cur, hide)}</Row>
-              {cur !== 'TWD' && <Row label="約當 TWD">{fmt_money(p.value_twd, 'TWD', hide)}</Row>}
-            </>
-          ) : (
-            <>
-              <Row label={`現價（${cur}）`}>{fmt_price(p.price)}</Row>
-              <Row label="今日漲跌">
-                <span className={pnl_color(p.day_change_pct)}>{fmt_pct(p.day_change_pct)}</span>
+              <Row label="現值（TWD）">{fmt_money(p.value_twd, 'TWD', hide)}</Row>
+              <Row label="未實現損益（TWD）">
+                <span className={pnl_color(p.pnl_twd)}>{fmt_signed_money(p.pnl_twd, 'TWD', hide)}</span>
               </Row>
-              <Row label="數量">{fmt_qty(h.quantity, hide)}</Row>
-              <Row label={`平均成本（${cur}）`}>{fmt_price(h.avg_cost)}</Row>
-              <Row label={`總成本（${cur}）`}>{fmt_money(p.cost, cur, hide)}</Row>
-              <Row label={`現值（${cur}）`}>{fmt_money(p.value, cur, hide)}</Row>
-              <Row label={`未實現損益（${cur}）`}>
-                <span className={pnl_color(p.pnl)}>
-                  {fmt_signed_money(p.pnl, cur, hide)}（{fmt_pct(p.pnl_pct)}）
-                </span>
-              </Row>
-              {cur !== 'TWD' && (
-                <>
-                  <Row label="現值（TWD）">{fmt_money(p.value_twd, 'TWD', hide)}</Row>
-                  <Row label="未實現損益（TWD）">
-                    <span className={pnl_color(p.pnl_twd)}>{fmt_signed_money(p.pnl_twd, 'TWD', hide)}</span>
-                  </Row>
-                </>
-              )}
-              <Row label="報價來源">{SOURCE_LABEL[p.price_source]}</Row>
-              <Row label="報價時間">{fmt_time(p.quote_time)}</Row>
-              <Row label="報價代號">{h.quote_id || '—'}</Row>
             </>
           )}
+          <Row label="報價來源">{SOURCE_LABEL[p.price_source]}</Row>
+          <Row label="報價時間">{fmt_time(p.quote_time)}</Row>
+          <Row label="報價代號">{h.quote_id || '—'}</Row>
           {h.note && <Row label="備註">{h.note}</Row>}
         </dl>
       </div>

@@ -10,7 +10,7 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
   const total = totals.value_twd
 
   return (
-    <section className="rounded-2xl bg-slate-900 p-5">
+    <section className="rounded-2xl bg-slate-900 p-4 sm:p-5">
       <p className="text-sm text-slate-400">總資產（TWD）</p>
       <p className="mt-1 text-3xl font-semibold tabular-nums sm:text-4xl">{fmt_money(total, 'TWD', hide)}</p>
 
@@ -23,7 +23,7 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
 
       {total > 0 && (
         <>
-          <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-slate-800">
+          <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-slate-800">
             {SECTION_TYPES.map((t) => (
               <div
                 key={t}
@@ -47,7 +47,7 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
       )}
 
       {portfolio.fx_rate != null && (
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-slate-500">
           USD/TWD {fmt_price(portfolio.fx_rate)}（{FX_SOURCE_LABEL[portfolio.fx_source]}）
         </p>
       )}

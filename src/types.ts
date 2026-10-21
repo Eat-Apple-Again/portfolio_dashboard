@@ -1,10 +1,8 @@
-export type AssetType = 'TW_STOCK' | 'US_STOCK' | 'CRYPTO' | 'CASH' | 'FX'
+export type AssetType = 'TW_STOCK' | 'US_STOCK' | 'CRYPTO' | 'FX'
 
-export type Currency = 'TWD' | 'USD'
-
-/** One row of the `holdings` sheet, as returned by Apps Script */
+/** One row of the `holdings` sheet: opening positions as of the start date */
 export interface Holding {
-  type: AssetType
+  type: AssetType | string
   symbol: string
   quote_id: string
   name: string
@@ -13,6 +11,47 @@ export interface Holding {
   currency: string
   account: string
   sheet_price: number | null
+  note: string
+}
+
+/** One row of the `accounts` sheet */
+export interface Account {
+  account: string
+  type: string
+  currency: string
+  opening_balance: number | null
+  opening_date: string | null
+  /** Broker (holdings.account) that settles through this cash account */
+  broker: string
+  note: string
+}
+
+export type TradeAction = 'BUY' | 'SELL' | 'DIVIDEND'
+
+export interface Trade {
+  id: string
+  trade_date: string | null
+  account: string
+  action: TradeAction | string
+  symbol: string
+  quantity: number | null
+  price: number | null
+  fee: number | null
+  tax: number | null
+  amount: number | null
+  cash_account: string
+  settle_date: string | null
+  note: string
+}
+
+export interface Transfer {
+  id: string
+  datetime: string | null
+  from_account: string
+  to_account: string
+  amount: number | null
+  to_amount: number | null
+  fee: number | null
   note: string
 }
 
@@ -25,9 +64,16 @@ export interface Quote {
 
 export type QuoteMap = Record<string, Quote | null>
 
-export type SheetResponse =
-  | { ok: true; updated_at: string; holdings: Holding[]; quotes: QuoteMap }
-  | { ok: false; error: string }
+export interface SheetData {
+  updated_at: string
+  holdings: Holding[]
+  accounts: Account[]
+  trades: Trade[]
+  transfers: Transfer[]
+  quotes: QuoteMap
+}
+
+export type SheetResponse = ({ ok: true } & SheetData) | { ok: false; error: string }
 
 export interface Credentials {
   api_url: string
@@ -36,7 +82,7 @@ export interface Credentials {
 
 export type PriceSource = 'live' | 'sheet' | 'none'
 
-/** Holding enriched with price and P/L; amounts are in the holding's own currency unless suffixed _twd */
+/** Holding after applying trades, enriched with price and P/L; amounts in the holding's currency unless suffixed _twd */
 export interface Position {
   holding: Holding
   price: number | null
@@ -52,12 +98,33 @@ export interface Position {
   pnl_twd: number | null
 }
 
-export type SectionType = Exclude<AssetType, 'FX'>
+/** Cash account after applying transfers and settled trades */
+export interface AccountBalance {
+  account: Account
+  balance: number
+  pending: number
+  available: number
+  balance_twd: number | null
+  available_twd: number | null
+  /** Earliest future settlement debit, for shortfall alerts */
+  next_debit_ts: number | null
+}
+
+export interface Shortfall {
+  account: string
+  currency: string
+  amount: number
+  settle_ts: number | null
+}
+
+export type InvestType = 'TW_STOCK' | 'US_STOCK' | 'CRYPTO'
+export type SectionType = InvestType | 'CASH'
 
 export interface Portfolio {
   fx_rate: number | null
   fx_source: 'manual' | 'live' | 'sheet' | 'none'
-  sections: Record<SectionType, Position[]>
+  sections: Record<InvestType, Position[]>
+  accounts: AccountBalance[]
   totals: {
     value_twd: number
     invested_cost_twd: number
@@ -66,4 +133,39 @@ export interface Portfolio {
     by_type: Record<SectionType, number>
   }
   warnings: string[]
+  shortfalls: Shortfall[]
+}
+
+export interface NewHolding {
+  type: InvestType
+  quote_id: string
+  name: string
+}
+
+export interface NewTrade {
+  id: string
+  trade_date: string
+  account: string
+  action: TradeAction
+  symbol: string
+  quantity: number | ''
+  price: number | ''
+  fee: number | ''
+  tax: number | ''
+  amount: number
+  cash_account: string
+  settle_date: string
+  note: string
+  new_holding?: NewHolding
+}
+
+export interface NewTransfer {
+  id: string
+  datetime: string
+  from_account: string
+  to_account: string
+  amount: number
+  to_amount: number | ''
+  fee: number | ''
+  note: string
 }

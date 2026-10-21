@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, fetch_okx_quotes, fetch_sheet } from '../lib/api'
 import { build_portfolio } from '../lib/portfolio'
-import type { Credentials, Portfolio } from '../types'
+import type { Credentials, Portfolio, SheetData } from '../types'
 
 const REFRESH_MS = 60_000
 
 interface State {
+  sheet: SheetData | null
   portfolio: Portfolio | null
   loading: boolean
   error: string | null
@@ -15,6 +16,7 @@ interface State {
 
 export function usePortfolio(credentials: Credentials) {
   const [state, set_state] = useState<State>({
+    sheet: null,
     portfolio: null,
     loading: true,
     error: null,
@@ -38,7 +40,8 @@ export function usePortfolio(credentials: Credentials) {
       const crypto_quotes = await fetch_okx_quotes(crypto_ids, controller.signal)
 
       set_state({
-        portfolio: build_portfolio(sheet.holdings, { ...sheet.quotes, ...crypto_quotes }),
+        sheet,
+        portfolio: build_portfolio(sheet, { ...sheet.quotes, ...crypto_quotes }),
         loading: false,
         error: null,
         unauthorized: false,

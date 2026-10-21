@@ -1,10 +1,14 @@
 import { useState, type ButtonHTMLAttributes } from 'react'
+import { AccountsSection } from './components/accounts_section'
 import { DetailSheet } from './components/detail_sheet'
+import { EntrySheet } from './components/entry_sheet'
 import { HoldingsSection } from './components/holdings_section'
 import { LockScreen } from './components/lock_screen'
+import { RecentRecords } from './components/recent_records'
 import { SummaryCard } from './components/summary_card'
 import { usePortfolio } from './hooks/use_portfolio'
-import { SECTION_TYPES } from './lib/portfolio'
+import { fmt_money } from './lib/format'
+import { INVEST_TYPES } from './lib/portfolio'
 import {
   clear_credentials,
   load_credentials,
@@ -41,13 +45,14 @@ function Dashboard({
   credentials: Credentials
   on_logout: (reason?: string | null) => void
 }) {
-  const { portfolio, loading, error, unauthorized, fetched_at, refresh } = usePortfolio(credentials)
+  const { sheet, portfolio, loading, error, unauthorized, fetched_at, refresh } = usePortfolio(credentials)
   const [hide, set_hide] = useState(load_hide_amounts)
   const [selected_key, set_selected_key] = useState<string | null>(null)
+  const [entry_open, set_entry_open] = useState(false)
 
   // Look up by key so the open detail sheet reflects refreshed prices
   const selected = selected_key
-    ? (SECTION_TYPES.flatMap((t) => portfolio?.sections[t] ?? []).find((p) => position_key(p) === selected_key) ??
+    ? (INVEST_TYPES.flatMap((t) => portfolio?.sections[t] ?? []).find((p) => position_key(p) === selected_key) ??
       null)
     : null
 
@@ -57,7 +62,7 @@ function Dashboard({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+    <div className="mx-auto max-w-6xl px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <header className="mb-4 flex items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">Portfolio</h1>
@@ -68,6 +73,15 @@ function Dashboard({
           </p>
         </div>
         <nav className="flex items-center gap-1 text-sm">
+          {sheet && (
+            <button
+              type="button"
+              onClick={() => set_entry_open(true)}
+              className="rounded-lg bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-500 active:bg-sky-700"
+            >
+              ＋ 記一筆
+            </button>
+          )}
           <HeaderButton onClick={refresh} disabled={loading}>
             <span className={loading ? 'inline-block animate-spin' : ''}>↻</span>
           </HeaderButton>
@@ -101,24 +115,56 @@ function Dashboard({
             </ul>
           )}
 
+          {portfolio.shortfalls.length > 0 && (
+            <ul className="space-y-1 rounded-xl bg-rose-950/70 px-4 py-3 text-sm text-rose-200">
+              {portfolio.shortfalls.map((sf) => (
+                <li key={sf.account}>
+                  ⚠ <strong>{sf.account}</strong> 交割款不足 {fmt_money(sf.amount, sf.currency, hide)} {sf.currency}
+                  {sf.settle_ts && `，${new Date(sf.settle_ts).toLocaleDateString('zh-TW')} 扣款前請轉入`}
+                </li>
+              ))}
+            </ul>
+          )}
+
           <SummaryCard portfolio={portfolio} hide={hide} />
 
-          {SECTION_TYPES.map((t) => (
-            <HoldingsSection
-              key={t}
-              type={t}
-              positions={portfolio.sections[t]}
-              subtotal_twd={portfolio.totals.by_type[t]}
-              hide={hide}
-              on_select={(p) => set_selected_key(position_key(p))}
-            />
-          ))}
+          {/* Desktop: holdings on the left, cash and records on the right */}
+          <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-4 lg:space-y-0">
+            <div className="space-y-4">
+              {INVEST_TYPES.map((t) => (
+                <HoldingsSection
+                  key={t}
+                  type={t}
+                  positions={portfolio.sections[t]}
+                  subtotal_twd={portfolio.totals.by_type[t]}
+                  hide={hide}
+                  on_select={(p) => set_selected_key(position_key(p))}
+                />
+              ))}
+            </div>
+            <div className="space-y-4">
+              <AccountsSection accounts={portfolio.accounts} subtotal_twd={portfolio.totals.by_type.CASH} hide={hide} />
+              {sheet && <RecentRecords sheet={sheet} hide={hide} />}
+            </div>
+          </div>
         </div>
       )}
 
       {!portfolio && !error && <p className="py-20 text-center text-slate-500">載入中…</p>}
 
       {selected && <DetailSheet position={selected} hide={hide} on_close={() => set_selected_key(null)} />}
+
+      {entry_open && sheet && (
+        <EntrySheet
+          credentials={credentials}
+          sheet={sheet}
+          on_close={() => set_entry_open(false)}
+          on_saved={() => {
+            set_entry_open(false)
+            refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

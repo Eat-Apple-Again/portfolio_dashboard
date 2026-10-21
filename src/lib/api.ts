@@ -1,4 +1,4 @@
-import type { Credentials, QuoteMap, SheetResponse } from '../types'
+import type { Credentials, NewTrade, NewTransfer, QuoteMap, SheetData } from '../types'
 
 const OKX_TICKER_URL = 'https://www.okx.com/api/v5/market/ticker?instId='
 
@@ -15,21 +15,43 @@ export class ApiError extends Error {
  * Token goes in the POST body (never the URL).
  * text/plain keeps it a "simple" CORS request, so no preflight is needed.
  */
-export async function fetch_sheet(credentials: Credentials, signal?: AbortSignal) {
+async function call_api<T>(
+  credentials: Credentials,
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<T> {
   const res = await fetch(credentials.api_url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ token: credentials.token }),
+    body: JSON.stringify({ ...payload, token: credentials.token }),
     signal,
   })
   if (!res.ok) throw new ApiError(`Apps Script HTTP ${res.status}`)
 
-  const data = (await res.json()) as SheetResponse
+  const data = (await res.json()) as { ok: boolean; error?: string }
   if (!data.ok) {
-    const unauthorized = ['unauthorized', 'missing token'].includes(data.error)
-    throw new ApiError(data.error, unauthorized)
+    const error = data.error ?? 'unknown error'
+    throw new ApiError(error, ['unauthorized', 'missing token'].includes(error))
+  }
+  return data as T
+}
+
+export async function fetch_sheet(credentials: Credentials, signal?: AbortSignal) {
+  const data = await call_api<SheetData>(credentials, { action: 'get' }, signal)
+  // An outdated Apps Script deployment returns holdings only
+  const required = ['holdings', 'accounts', 'trades', 'transfers'] as const
+  if (required.some((k) => !Array.isArray(data[k]))) {
+    throw new ApiError('Apps Script 版本過舊：請貼上最新的 Code.gs，並在「管理部署作業」部署新版本')
   }
   return data
+}
+
+export function add_trade(credentials: Credentials, record: NewTrade) {
+  return call_api<{ id: string }>(credentials, { action: 'add_trade', record })
+}
+
+export function add_transfer(credentials: Credentials, record: NewTransfer) {
+  return call_api<{ id: string }>(credentials, { action: 'add_transfer', record })
 }
 
 interface OkxTicker {
