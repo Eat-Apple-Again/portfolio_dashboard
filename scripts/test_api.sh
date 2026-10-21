@@ -17,6 +17,9 @@ printf '{"token":"%s"}' "$TOKEN" |
       console.log("ok        :", r.ok);
       console.log("updated_at:", r.updated_at);
       console.log("holdings  :", r.holdings.length, "rows");
+      console.log("accounts  :", (r.accounts || []).length, "rows");
+      console.log("trades    :", (r.trades || []).length, "rows");
+      console.log("transfers :", (r.transfers || []).length, "rows");
       for (const [id, q] of Object.entries(r.quotes)) {
         console.log(" ", id.padEnd(12), q ? `price=${q.price} ${q.currency}` : "NO QUOTE (fallback to sheet_price)");
       }
