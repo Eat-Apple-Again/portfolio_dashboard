@@ -5,7 +5,8 @@
  * Auth: POST body {"token": "<API_TOKEN>"}; the token lives in Script Properties, never in code or URLs.
  */
 
-const SHEET = { holdings: 'holdings', accounts: 'accounts', trades: 'trades', transfers: 'transfers' };
+const SHEET = { holdings: 'holdings', accounts: 'accounts', trades: 'trades', transfers: 'transfers', presets: 'presets' };
+const HISTORY_INTERVALS = ['1d', '1mo'];
 const YAHOO_TYPES = ['TW_STOCK', 'US_STOCK', 'FX'];
 const TRADE_ACTIONS = ['BUY', 'SELL', 'DIVIDEND'];
 // Allowed shapes for holdings created from the app (BUY of a new symbol)
@@ -15,6 +16,8 @@ const NEW_HOLDING_RULES = {
   CRYPTO: { currency: 'USD', symbol: /^[A-Z0-9]{1,15}$/, quote_id: /^[A-Z0-9]{1,15}-USDT$/ },
 };
 const CACHE_SECONDS = 60;
+const HISTORY_CACHE_SECONDS = 6 * 60 * 60;
+const HISTORY_MAX_DAYS = 11 * 366; // 10 years of monthly data plus slack for the month-aligned start
 const MAX_AMOUNT = 1e12;
 
 function doGet() {
@@ -44,6 +47,8 @@ function handle_(body) {
     switch (body.action || 'get') {
       case 'get':
         return get_all_();
+      case 'history':
+        return get_history_(body.start, body.interval);
       case 'add_trade':
         return with_lock_(() => add_trade_(body.record || {}));
       case 'add_transfer':
@@ -79,6 +84,7 @@ function get_all_() {
     opening_balance: num_(r.opening_balance),
     opening_date: date_cell_(r.opening_date),
     broker: str_(r.broker),
+    group: str_(r.group),
     note: str_(r.note),
   }));
 
@@ -109,6 +115,11 @@ function get_all_() {
     note: str_(r.note),
   }));
 
+  // Optional sheet: quick-pick notes for the entry form
+  const presets = read_optional_rows_(SHEET.presets)
+    .map((r) => ({ kind: str_(r.kind).toUpperCase(), note: str_(r.note) }))
+    .filter((p) => p.note);
+
   const yahoo_ids = holdings
     .filter((h) => YAHOO_TYPES.includes(h.type) && h.quote_id)
     .map((h) => h.quote_id);
@@ -120,8 +131,13 @@ function get_all_() {
     accounts,
     trades,
     transfers,
+    presets,
     quotes: fetch_yahoo_quotes_(yahoo_ids),
   };
+}
+
+function read_optional_rows_(name) {
+  return SpreadsheetApp.getActive().getSheetByName(name) ? read_rows_(name) : [];
 }
 
 /** Rows as objects keyed by header; fully empty rows are skipped */
@@ -182,6 +198,65 @@ function fetch_yahoo_quotes_(ids) {
   });
   cache.putAll(to_cache, CACHE_SECONDS);
   return result;
+}
+
+// ---------- history ----------
+
+/** Closes since `start` (YYYYMMDD) for every Yahoo-quoted holding: { [quote_id]: [[YYYY-MM-DD, close], ...] }; interval 1d or 1mo */
+function get_history_(start, interval) {
+  const bar = interval ? enum_(interval, HISTORY_INTERVALS.map((v) => v.toUpperCase()), 'interval').toLowerCase() : '1d';
+  const from = date_(start, 'start');
+  const days = (Date.now() - from.getTime()) / 86400000;
+  if (days < 0 || days > HISTORY_MAX_DAYS) fail_('start 超出可查詢範圍');
+
+  const ids = [
+    ...new Set(
+      read_rows_(SHEET.holdings)
+        .filter((h) => YAHOO_TYPES.includes(str_(h.type).toUpperCase()) && str_(h.quote_id))
+        .map((h) => str_(h.quote_id))
+    ),
+  ];
+  const cache = CacheService.getScriptCache();
+  const key = (id) => `h:${bar}:${id}:${str_(start)}`;
+  const cached = cache.getAll(ids.map(key));
+  const series = {};
+  const missing = ids.filter((id) => {
+    const hit = cached[key(id)];
+    if (hit) series[id] = JSON.parse(hit);
+    return !hit;
+  });
+
+  // A week of lead-in so the first day has a previous close to carry forward
+  const period1 = Math.floor(from.getTime() / 1000) - 7 * 86400;
+  const period2 = Math.floor(Date.now() / 1000);
+  const responses = UrlFetchApp.fetchAll(
+    missing.map((id) => ({
+      url: `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(id)}?interval=${bar}&period1=${period1}&period2=${period2}`,
+      muteHttpExceptions: true,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    }))
+  );
+
+  const to_cache = {};
+  responses.forEach((res, i) => {
+    const id = missing[i];
+    series[id] = [];
+    if (res.getResponseCode() !== 200) return;
+    try {
+      const result = JSON.parse(res.getContentText()).chart.result[0];
+      const tz = result.meta.exchangeTimezoneName || 'UTC';
+      const closes = result.indicators.quote[0].close;
+      (result.timestamp || []).forEach((ts, j) => {
+        if (closes[j] == null) return;
+        series[id].push([Utilities.formatDate(new Date(ts * 1000), tz, 'yyyy-MM-dd'), closes[j]]);
+      });
+      to_cache[key(id)] = JSON.stringify(series[id]);
+    } catch (_) {
+      // leave empty; frontend carries the nearest known price
+    }
+  });
+  if (Object.keys(to_cache).length) cache.putAll(to_cache, HISTORY_CACHE_SECONDS);
+  return { ok: true, series };
 }
 
 // ---------- write (append-only) ----------
@@ -260,25 +335,28 @@ function validate_new_holding_(h, account, symbol, action) {
   };
 }
 
+/** Transfer between own accounts, or income (no from_account) / expense (no to_account) */
 function add_transfer_(r) {
   const accounts = {};
   read_rows_(SHEET.accounts).forEach((a) => (accounts[str_(a.account)] = str_(a.currency).toUpperCase()));
 
   const from = str_(r.from_account);
   const to = str_(r.to_account);
-  if (!(from in accounts)) fail_(`from_account 不存在於 accounts：${from}`);
-  if (!(to in accounts)) fail_(`to_account 不存在於 accounts：${to}`);
-  if (from === to) fail_('轉出與轉入帳戶不可相同');
+  if (!from && !to) fail_('至少需要轉出或轉入帳戶');
+  if (from && !(from in accounts)) fail_(`from_account 不存在於 accounts：${from}`);
+  if (to && !(to in accounts)) fail_(`to_account 不存在於 accounts：${to}`);
+  if (from && from === to) fail_('轉出與轉入帳戶不可相同');
 
-  const cross_currency = accounts[from] !== accounts[to];
+  const both = Boolean(from && to);
+  const cross_currency = both && accounts[from] !== accounts[to];
   const record = {
     id: id_(r.id),
     datetime: datetime_(r.datetime, 'datetime'),
     from_account: from,
     to_account: to,
     amount: amount_(r.amount, 'amount', true),
-    to_amount: amount_(r.to_amount, 'to_amount', cross_currency),
-    fee: amount_(r.fee, 'fee', false),
+    to_amount: both ? amount_(r.to_amount, 'to_amount', cross_currency) : '',
+    fee: from ? amount_(r.fee, 'fee', false) : '',
     note: note_(r.note),
     created_at: new Date(),
   };
