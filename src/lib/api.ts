@@ -43,6 +43,7 @@ export async function fetch_sheet(credentials: Credentials, signal?: AbortSignal
   if (required.some((k) => !Array.isArray(data[k]))) {
     throw new ApiError('Apps Script 版本過舊：請貼上最新的 Code.gs，並在「管理部署作業」部署新版本')
   }
+  data.presets ??= []
   return data
 }
 
@@ -86,4 +87,61 @@ export async function fetch_okx_quotes(inst_ids: string[], signal?: AbortSignal)
     quotes[id] = r.status === 'fulfilled' ? r.value : null
   })
   return quotes
+}
+
+/** [YYYY-MM-DD, close] pairs, oldest first */
+export type DailySeries = [string, number][]
+
+export async function fetch_history(
+  credentials: Credentials,
+  start: string,
+  signal?: AbortSignal,
+  interval: '1d' | '1mo' = '1d',
+) {
+  try {
+    const data = await call_api<{ series: Record<string, DailySeries> }>(
+      credentials,
+      { action: 'history', start, interval },
+      signal,
+    )
+    return data.series
+  } catch (err) {
+    if (err instanceof ApiError && err.message === 'unknown action') {
+      throw new ApiError('Apps Script 版本過舊：請貼上最新的 Code.gs，並在「管理部署作業」部署新版本')
+    }
+    throw err
+  }
+}
+
+const OKX_CANDLES_URL = 'https://www.okx.com/api/v5/market/history-candles'
+const OKX_MAX_PAGES = 40
+
+const taipei_day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' })
+
+/** Closes from OKX (1D / 1M bars are aligned to UTC+8, i.e. Taiwan calendar), paginated back to `start_ts` */
+export async function fetch_okx_history(
+  inst_ids: string[],
+  start_ts: number,
+  signal?: AbortSignal,
+  bar: '1D' | '1M' = '1D',
+) {
+  const out: Record<string, DailySeries> = {}
+  await Promise.all(
+    [...new Set(inst_ids)].map(async (id) => {
+      const rows: DailySeries = []
+      let after = ''
+      for (let page = 0; page < OKX_MAX_PAGES; page++) {
+        const qs = new URLSearchParams({ instId: id, bar, limit: '100', ...(after && { after }) })
+        const res = await fetch(`${OKX_CANDLES_URL}?${qs}`, { signal })
+        if (!res.ok) break
+        const body = (await res.json()) as { code: string; data: string[][] }
+        if (body.code !== '0' || body.data.length === 0) break
+        for (const c of body.data) rows.push([taipei_day.format(new Date(Number(c[0]))), Number(c[4])])
+        after = body.data[body.data.length - 1][0]
+        if (Number(after) <= start_ts - 7 * 86_400_000) break
+      }
+      out[id] = rows.reverse()
+    }),
+  )
+  return out
 }

@@ -1,50 +1,53 @@
 import { fmt_money, fmt_pct, fmt_price, fmt_qty, fmt_signed_money, pnl_color } from '../lib/format'
-import type { InvestType, Position } from '../types'
+import type { AccountBalance, AccountGroup, Position, SectionType } from '../types'
 import { SECTION_META } from './section_meta'
 import { SectionCard } from './section_card'
 
 interface Props {
-  type: InvestType
-  positions: Position[]
-  subtotal_twd: number
+  group: AccountGroup
   hide: boolean
   on_select: (p: Position) => void
 }
 
 // Container query: table columns only when the card itself is wide enough
 const GRID = 'grid grid-cols-[1fr_auto] @2xl:grid-cols-[1.6fr_repeat(6,1fr)] gap-x-3'
+const EPS = 1e-9
 
-export function HoldingsSection({ type, positions, subtotal_twd, hide, on_select }: Props) {
-  if (positions.length === 0) return null
-  const meta = SECTION_META[type]
+/** One brokerage / exchange / wallet: its positions followed by its cash */
+export function GroupSection({ group, hide, on_select }: Props) {
+  const types = [...new Set(group.positions.map((p) => p.holding.type as SectionType))]
+  const currencies = [...new Set(group.positions.map((p) => p.holding.currency))]
+  const dot = SECTION_META[types[0] ?? 'CASH'].dot
 
   return (
     <SectionCard
-      id={`holdings:${type}`}
+      id={`group:${group.account}`}
       title={
         <>
-          <span className={`size-2.5 rounded-full ${meta.dot}`} />
-          {meta.label}
+          <span className={`size-2.5 rounded-full ${dot}`} />
+          {group.account}
           <span className="text-xs font-normal text-slate-500">
-            {meta.currency} · {positions.length}
+            {[...types.map((t) => SECTION_META[t].label), ...currencies].join(' · ')}
           </span>
         </>
       }
-      right={`NT$ ${fmt_money(subtotal_twd, 'TWD', hide)}`}
+      right={`NT$ ${fmt_money(group.value_twd, 'TWD', hide)}`}
     >
-      <div className={`${GRID} hidden px-5 pb-1 text-right text-xs text-slate-500 @2xl:grid`}>
-        <span className="text-left">標的</span>
-        <span>數量</span>
-        <span>均價</span>
-        <span>現價</span>
-        <span>今日</span>
-        <span>現值</span>
-        <span>損益</span>
-      </div>
+      {group.positions.length > 0 && (
+        <div className={`${GRID} hidden px-5 pb-1 text-right text-xs text-slate-500 @2xl:grid`}>
+          <span className="text-left">標的</span>
+          <span>數量</span>
+          <span>均價</span>
+          <span>現價</span>
+          <span>今日</span>
+          <span>現值</span>
+          <span>損益</span>
+        </div>
+      )}
 
       <ul className="divide-y divide-slate-800/80">
-        {positions.map((p) => (
-          <li key={`${p.holding.account}:${p.holding.symbol}`}>
+        {group.positions.map((p) => (
+          <li key={p.holding.symbol}>
             <button
               type="button"
               onClick={() => on_select(p)}
@@ -53,7 +56,7 @@ export function HoldingsSection({ type, positions, subtotal_twd, hide, on_select
               <div className="min-w-0">
                 <p className="truncate font-medium">{p.holding.name || p.holding.symbol}</p>
                 <p className="truncate text-xs text-slate-500">
-                  {p.holding.symbol} · {p.holding.account}
+                  {p.holding.symbol}
                   {p.price_source === 'sheet' && <span className="ml-1 text-amber-400">（試算表報價）</span>}
                   {p.price_source === 'none' && <span className="ml-1 text-rose-400">（無報價）</span>}
                 </p>
@@ -61,6 +64,9 @@ export function HoldingsSection({ type, positions, subtotal_twd, hide, on_select
               <PositionCells p={p} hide={hide} />
             </button>
           </li>
+        ))}
+        {group.cash.map((a) => (
+          <CashRow key={a.account.account} a={a} hide={hide} />
         ))}
       </ul>
     </SectionCard>
@@ -89,5 +95,26 @@ function PositionCells({ p, hide }: { p: Position; hide: boolean }) {
         <span className="block text-xs">{fmt_pct(p.pnl_pct)}</span>
       </span>
     </>
+  )
+}
+
+/** Broker / exchange cash, e.g. brokerage USD cash or exchange USDT */
+function CashRow({ a, hide }: { a: AccountBalance; hide: boolean }) {
+  const cur = a.account.currency
+  const label = a.account.type === 'EXCHANGE' ? 'USDT' : `現金（${cur}）`
+  const pending = Math.abs(a.pending) > EPS
+
+  return (
+    <li className={`${GRID} items-center px-5 py-2`}>
+      <div className="min-w-0">
+        <p className="truncate font-medium text-slate-300">{label}</p>
+        {pending && (
+          <p className="truncate text-xs text-amber-400">
+            待交割 {fmt_signed_money(a.pending, cur, hide)}・可用 {fmt_money(a.available, cur, hide)}
+          </p>
+        )}
+      </div>
+      <p className="text-right tabular-nums @2xl:col-start-6">{fmt_money(a.balance, cur, hide)}</p>
+    </li>
   )
 }

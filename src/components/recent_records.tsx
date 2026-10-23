@@ -30,13 +30,14 @@ export function RecentRecords({ sheet, hide }: { sheet: SheetData; hide: boolean
       }
     }),
     ...sheet.transfers.map((tr) => {
-      const cur = currency_of.get(tr.from_account) ?? ''
+      const cur = currency_of.get(tr.from_account || tr.to_account) ?? ''
+      const kind = !tr.from_account ? '收入' : !tr.to_account ? '支出' : '轉帳'
       return {
         key: `x:${tr.id || tr.datetime}`,
         ts: to_ts(tr.datetime) ?? 0,
         date_only: false,
-        title: `轉帳 ${tr.from_account} → ${tr.to_account}`,
-        detail: `${fmt_money(tr.amount, cur, hide)} ${cur}`,
+        title: `${kind} ${tr.from_account || ''}${tr.from_account && tr.to_account ? ' → ' : ''}${tr.to_account || ''}`,
+        detail: `${fmt_money(tr.amount, cur, hide)} ${cur}${tr.note ? `・${tr.note}` : ''}`,
       }
     }),
   ]

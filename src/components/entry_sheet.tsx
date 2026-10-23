@@ -71,7 +71,7 @@ export function EntrySheet({ credentials, sheet, on_close, on_saved }: Props) {
           <Segmented
             options={[
               { value: 'trade', label: '交易' },
-              { value: 'transfer', label: '轉帳' },
+              { value: 'transfer', label: '轉帳 / 收支' },
             ]}
             value={tab}
             on_change={set_tab}
@@ -86,7 +86,12 @@ export function EntrySheet({ credentials, sheet, on_close, on_saved }: Props) {
             on_submit={submit_trade}
           />
         ) : (
-          <TransferForm accounts={sheet.accounts} submitting={submitting} on_submit={submit_transfer} />
+          <TransferForm
+            accounts={sheet.accounts}
+            presets={sheet.presets}
+            submitting={submitting}
+            on_submit={submit_transfer}
+          />
         )}
 
         {error && <p className="mt-3 rounded-lg bg-rose-950/60 px-3 py-2 text-sm text-rose-300">送出失敗：{error}</p>}

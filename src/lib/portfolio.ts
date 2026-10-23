@@ -1,5 +1,6 @@
 import type {
   AccountBalance,
+  AccountGroup,
   Holding,
   InvestType,
   Portfolio,
@@ -71,28 +72,31 @@ function price_position(h: Holding, quotes: QuoteMap, fx_rate: number | null): P
   }
 }
 
-interface PositionState {
+export interface PositionState {
   holding: Holding
   qty: number
   cost: number | null
 }
 
-interface CashState {
+export interface CashState {
   balance: number
   pending: number
   next_debit_ts: number | null
 }
 
-/**
- * Opening snapshot (holdings + accounts) + events after each account's opening_date.
- * - Positions change on the trade datetime (moving-average cost; sells keep the average)
- * - Cash changes on settle_date; settlements still in the future are reported as pending
- */
-export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, quotes: QuoteMap, now = Date.now()): Portfolio {
-  const fx = resolve_fx(data.holdings, quotes)
-  const warnings: string[] = []
-  if (fx.rate == null) warnings.push('找不到 USD/TWD 匯率，美元資產無法換算成台幣')
+export interface ReplayState {
+  positions: Map<string, PositionState>
+  cash: Map<string, CashState>
+  warnings: string[]
+}
 
+/**
+ * Opening snapshot (holdings + accounts) + events up to `now`.
+ * - Positions change on the trade date (moving-average cost; sells keep the average)
+ * - Cash changes on settle_date; settlements after `now` are reported as pending
+ */
+export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: number): ReplayState {
+  const warnings: string[] = []
   // Opening date per cash account; trades are dated against their cash account
   const opening = new Map<string, number>()
   const cash = new Map<string, CashState>()
@@ -177,7 +181,7 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
 
   for (const tr of data.transfers) {
     const ts = to_ts(tr.datetime)
-    const label = `${tr.from_account} → ${tr.to_account}`
+    const label = `${tr.from_account || '收入'} → ${tr.to_account || '支出'}`
     if (ts == null || tr.amount == null) {
       warnings.push(`transfers「${label}」缺少 datetime 或 amount，已略過`)
       continue
@@ -185,13 +189,27 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
     if (ts > now) continue
     const from = cash.get(tr.from_account)
     const to = cash.get(tr.to_account)
-    if (!from || !to) {
+    // A blank side is outside money: income has no from_account, expense has no to_account
+    if ((tr.from_account && !from) || (tr.to_account && !to) || (!from && !to)) {
       warnings.push(`transfers「${label}」的帳戶不在 accounts 中`)
       continue
     }
-    if (ts >= opening.get(tr.from_account)!) from.balance -= tr.amount + (tr.fee ?? 0)
-    if (ts >= opening.get(tr.to_account)!) to.balance += tr.to_amount ?? tr.amount
+    if (from && ts >= opening.get(tr.from_account)!) from.balance -= tr.amount + (tr.fee ?? 0)
+    if (to && ts >= opening.get(tr.to_account)!) to.balance += tr.to_amount ?? tr.amount
   }
+
+  return { positions, cash, warnings }
+}
+
+/** Current portfolio: replayed state valued at live quotes */
+export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, quotes: QuoteMap, now = Date.now()): Portfolio {
+  const fx = resolve_fx(data.holdings, quotes)
+  const warnings: string[] = []
+  if (fx.rate == null) warnings.push('找不到 USD/TWD 匯率，美元資產無法換算成台幣')
+
+  const state = replay(data, now)
+  const { positions, cash } = state
+  warnings.push(...state.warnings)
 
   const sections = Object.fromEntries(INVEST_TYPES.map((t) => [t, [] as Position[]])) as Record<
     InvestType,
@@ -242,6 +260,8 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
     CASH: accounts.reduce((s, a) => s + (a.available_twd ?? 0), 0),
   }
 
+  const groups = build_groups(data.holdings, invested_positions(sections), accounts)
+
   const invested = INVEST_TYPES.flatMap((t) => sections[t])
   const invested_cost_twd = invested.reduce((s, p) => s + (p.cost_twd ?? 0), 0)
   const invested_pnl_twd = invested.reduce((s, p) => s + (p.pnl_twd ?? 0), 0)
@@ -249,8 +269,9 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
   return {
     fx_rate: fx.rate,
     fx_source: fx.source,
-    sections,
-    accounts,
+    groups,
+    // Bank accounts only; broker / exchange cash is shown inside its group
+    accounts: accounts.filter((a) => !is_broker_cash(a)),
     totals: {
       value_twd: Object.values(by_type).reduce((s, v) => s + v, 0),
       invested_cost_twd,
@@ -261,4 +282,46 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
     warnings,
     shortfalls,
   }
+}
+
+function invested_positions(sections: Record<InvestType, Position[]>): Position[] {
+  return INVEST_TYPES.flatMap((t) => sections[t])
+}
+
+function is_broker_cash(a: AccountBalance): boolean {
+  return a.account.type === 'BROKER' || a.account.type === 'EXCHANGE'
+}
+
+/**
+ * One group per holding account, in the order accounts first appear in the holdings sheet.
+ * Broker / exchange cash joins the group named by its `broker` column (or its own name).
+ */
+function build_groups(holdings: Holding[], positions: Position[], accounts: AccountBalance[]): AccountGroup[] {
+  const groups = new Map<string, AccountGroup>()
+  const ensure = (account: string) => {
+    let g = groups.get(account)
+    if (!g) {
+      g = { account, positions: [], cash: [], value_twd: 0 }
+      groups.set(account, g)
+    }
+    return g
+  }
+
+  for (const h of holdings) {
+    if ((INVEST_TYPES as string[]).includes(h.type) && h.account) ensure(h.account)
+  }
+  for (const p of positions) {
+    const g = ensure(p.holding.account)
+    g.positions.push(p)
+    g.value_twd += p.value_twd ?? 0
+  }
+  for (const a of accounts) {
+    if (!is_broker_cash(a)) continue
+    const g = ensure(a.account.broker || a.account.account)
+    g.cash.push(a)
+    g.value_twd += a.available_twd ?? 0
+  }
+
+  for (const g of groups.values()) g.positions.sort((a, b) => (b.value_twd ?? 0) - (a.value_twd ?? 0))
+  return [...groups.values()].filter((g) => g.positions.length > 0 || g.cash.length > 0)
 }

@@ -23,6 +23,8 @@ export interface Account {
   opening_date: string | null
   /** Broker (holdings.account) that settles through this cash account */
   broker: string
+  /** Optional chart grouping for bank accounts, e.g. an emergency fund */
+  group: string
   note: string
 }
 
@@ -70,7 +72,14 @@ export interface SheetData {
   accounts: Account[]
   trades: Trade[]
   transfers: Transfer[]
+  presets: Preset[]
   quotes: QuoteMap
+}
+
+/** Quick-pick note from the optional `presets` sheet; kind = TRANSFER / INCOME / EXPENSE / ALL */
+export interface Preset {
+  kind: string
+  note: string
 }
 
 export type SheetResponse = ({ ok: true } & SheetData) | { ok: false; error: string }
@@ -117,13 +126,21 @@ export interface Shortfall {
   settle_ts: number | null
 }
 
+/** Positions and broker cash that live in the same account (e.g. a brokerage) */
+export interface AccountGroup {
+  account: string
+  positions: Position[]
+  cash: AccountBalance[]
+  value_twd: number
+}
+
 export type InvestType = 'TW_STOCK' | 'US_STOCK' | 'CRYPTO'
 export type SectionType = InvestType | 'CASH'
 
 export interface Portfolio {
   fx_rate: number | null
   fx_source: 'manual' | 'live' | 'sheet' | 'none'
-  sections: Record<InvestType, Position[]>
+  groups: AccountGroup[]
   accounts: AccountBalance[]
   totals: {
     value_twd: number

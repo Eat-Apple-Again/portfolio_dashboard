@@ -4,6 +4,7 @@ const CREDENTIALS_KEY = 'portfolio_dashboard_credentials'
 const HIDE_AMOUNTS_KEY = 'portfolio_dashboard_hide_amounts'
 // Legacy key from an earlier version; still cleared on logout
 const PREFS_KEY = 'portfolio_dashboard_prefs'
+const FORECAST_KEY = 'portfolio_dashboard_forecast'
 
 // Only accept Apps Script web app URLs so the token can never be sent to another host
 const API_URL_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/
@@ -36,6 +37,7 @@ export function clear_credentials(): void {
   try {
     localStorage.removeItem(CREDENTIALS_KEY)
     localStorage.removeItem(PREFS_KEY)
+    localStorage.removeItem(FORECAST_KEY)
   } catch {
     // ignore
   }
@@ -75,6 +77,24 @@ export function save_collapsed(id: string, collapsed: boolean): void {
     if (collapsed) ids.add(id)
     else ids.delete(id)
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]))
+  } catch {
+    // ignore
+  }
+}
+
+/** Forecast inputs (contributions, assumptions); device-only, cleared on logout */
+export function load_forecast_settings<T>(): Partial<T> | null {
+  try {
+    const raw = localStorage.getItem(FORECAST_KEY)
+    return raw ? (JSON.parse(raw) as Partial<T>) : null
+  } catch {
+    return null
+  }
+}
+
+export function save_forecast_settings<T>(settings: T): void {
+  try {
+    localStorage.setItem(FORECAST_KEY, JSON.stringify(settings))
   } catch {
     // ignore
   }
