@@ -6,6 +6,7 @@ import type { Portfolio, SheetData } from '../types'
 import { HistoryChart, type ChartMode } from './history_chart'
 import { Segmented } from './form_fields'
 import { SERIES_COLORS } from './section_meta'
+import { apply_pnl_style, load_pnl_style, save_pnl_style } from '../lib/storage'
 
 type Range = '1M' | '3M' | '6M' | '1Y' | 'ALL'
 
@@ -30,6 +31,13 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
   const [range, set_range] = useState<Range>('ALL')
   const [mode, set_mode] = useState<ChartMode>('total')
   const [show_table, set_show_table] = useState(false)
+  const [pnl_style, set_pnl_style] = useState(load_pnl_style)
+  const toggle_pnl_style = () => {
+    const next = pnl_style === 'tw' ? 'us' : 'tw'
+    save_pnl_style(next)
+    apply_pnl_style(next)
+    set_pnl_style(next)
+  }
 
   const all_points = useMemo(
     () => (series ? build_history(sheet, series, portfolio) : []),
@@ -68,15 +76,15 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
       </div>
 
       <section className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-900 p-4 sm:grid-cols-4 sm:p-5">
-        <Stat label="總資產" value={fmt_money(last?.total ?? 0, 'TWD', hide)} />
+        <Stat label="投資總值" value={fmt_money(last?.total ?? 0, 'TWD', hide)} />
         <Stat
           label="期間變化"
           value={fmt_signed_money(change, 'TWD', hide)}
           sub={first?.total ? fmt_pct(change / first.total) : undefined}
           tone={change}
         />
-        <Stat label="市場損益" value={fmt_signed_money(market, 'TWD', hide)} tone={market} />
-        <Stat label="收入 − 支出" value={fmt_signed_money(flows, 'TWD', hide)} />
+        <Stat label="投資損益" value={fmt_signed_money(market, 'TWD', hide)} tone={market} />
+        <Stat label="淨轉入資金" value={fmt_signed_money(flows, 'TWD', hide)} />
       </section>
 
       <section className="rounded-2xl bg-slate-900 p-4 sm:p-5">
@@ -85,29 +93,41 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
             items={
               mode === 'total'
                 ? [
-                    { label: '總資產', color: SERIES_COLORS[0] },
-                    { label: '淨投入（期初 + 收入 − 支出）', color: SERIES_COLORS[1] },
+                    { label: '投資總值', color: SERIES_COLORS[0] },
+                    { label: '淨投入（期初 + 轉入 − 轉出）', color: SERIES_COLORS[1] },
+                    { label: '賺', color: 'var(--gain)', box: true },
+                    { label: '賠', color: 'var(--loss)', box: true },
                   ]
                 : table_groups.map((g) => ({ label: g, color: color_of(g), box: true }))
             }
           />
-          <div className="w-44">
-            <Segmented
-              options={[
-                { value: 'total', label: '總額' },
-                { value: 'stacked', label: '明細' },
-              ]}
-              value={mode}
-              on_change={set_mode}
-            />
+          <div className="flex items-center gap-2">
+            {mode === 'total' && (
+              <button
+                type="button"
+                onClick={toggle_pnl_style}
+                title="切換漲跌顏色（台股 / 美股）"
+                aria-label="切換漲跌顏色"
+                className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-sm hover:bg-slate-700"
+              >
+                <span className="text-gain">漲</span>
+                <span className="text-loss">跌</span>
+              </button>
+            )}
+            <div className="w-44">
+              <Segmented
+                options={[
+                  { value: 'total', label: '損益' },
+                  { value: 'stacked', label: '組成' },
+                ]}
+                value={mode}
+                on_change={set_mode}
+              />
+            </div>
           </div>
         </div>
 
         <HistoryChart points={points} mode={mode} groups={groups} hide={hide} />
-
-        {all_points.length < 3 && (
-          <p className="mt-3 text-xs text-slate-500">走勢從起始日（{all_points[0]?.key}）開始，每天會多一個資料點。</p>
-        )}
       </section>
 
       {first && last && (
@@ -151,8 +171,8 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
             <div className="grid grid-cols-4 gap-x-3 px-5 py-1 text-right text-xs text-slate-500">
               <span className="text-left">日期</span>
               <span>總資產</span>
-              <span>累計市場損益</span>
-              <span>當日收支</span>
+              <span>累計投資損益</span>
+              <span>當日轉入</span>
             </div>
             <ul className="divide-y divide-slate-800/80 text-sm tabular-nums">
               {[...points].reverse().map((p) => (

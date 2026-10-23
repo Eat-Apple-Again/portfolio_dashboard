@@ -92,6 +92,8 @@ export function HistoryChart({ points, mode, groups, hide }: Props) {
   const ap = active != null ? points[active] : null
   const tip_left = active != null && x(active) > width / 2
 
+  const gap = mode === 'total' ? gap_paths(points, x, y) : { gain: '', loss: '' }
+
   return (
     <div ref={wrap_ref} className="relative w-full select-none" style={{ height }}>
       {width > 0 && n > 0 && (
@@ -132,11 +134,9 @@ export function HistoryChart({ points, mode, groups, hide }: Props) {
 
           {mode === 'total' ? (
             <>
-              <path
-                d={`${line(points.map((p) => p.total))}L${x(n - 1)},${PAD.top + plot_h}L${x(0)},${PAD.top + plot_h}Z`}
-                fill={SERIES_COLORS[0]}
-                opacity={0.1}
-              />
+              {/* Gap between the two lines = cumulative investment P&L, colored by sign */}
+              <path d={gap.gain} style={{ fill: 'var(--gain)' }} opacity={0.3} />
+              <path d={gap.loss} style={{ fill: 'var(--loss)' }} opacity={0.3} />
               <path d={line(points.map((p) => p.net_invested))} fill="none" stroke={SERIES_COLORS[1]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
               <path d={line(points.map((p) => p.total))} fill="none" stroke={SERIES_COLORS[0]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
             </>
@@ -185,10 +185,10 @@ export function HistoryChart({ points, mode, groups, hide }: Props) {
           <p className="mb-1 text-slate-400">{ap.key}</p>
           {mode === 'total' ? (
             <>
-              <TipRow color={SERIES_COLORS[0]} label="總資產" value={fmt_money(ap.total, 'TWD', hide)} />
+              <TipRow color={SERIES_COLORS[0]} label="投資總值" value={fmt_money(ap.total, 'TWD', hide)} />
               <TipRow color={SERIES_COLORS[1]} label="淨投入" value={fmt_money(ap.net_invested, 'TWD', hide)} />
-              <TipRow label="累計市場損益" value={fmt_signed_money(ap.total - ap.net_invested, 'TWD', hide)} />
-              {ap.flow !== 0 && <TipRow label="當日收支" value={fmt_signed_money(ap.flow, 'TWD', hide)} />}
+              <TipRow label="累計投資損益" value={fmt_signed_money(ap.total - ap.net_invested, 'TWD', hide)} />
+              {ap.flow !== 0 && <TipRow label="當日轉入" value={fmt_signed_money(ap.flow, 'TWD', hide)} />}
             </>
           ) : (
             <>
@@ -218,4 +218,37 @@ function TipRow({ color, label, value }: { color?: string; label: string; value:
       <span className="text-slate-400">{label}</span>
     </p>
   )
+}
+
+/**
+ * Areas where total is above (gain) or below (loss) net invested. Crossing points are interpolated
+ * so each area closes exactly where the lines meet.
+ */
+function gap_paths(points: HistoryPoint[], x: (i: number) => number, y: (v: number) => number) {
+  const pts: { i: number; total: number; net: number }[] = []
+  points.forEach((p, i) => {
+    if (i > 0) {
+      const a = points[i - 1].total - points[i - 1].net_invested
+      const b = p.total - p.net_invested
+      if (a * b < 0) {
+        const t = a / (a - b)
+        const net = points[i - 1].net_invested + t * (p.net_invested - points[i - 1].net_invested)
+        pts.push({ i: i - 1 + t, total: net, net })
+      }
+    }
+    pts.push({ i, total: p.total, net: p.net_invested })
+  })
+  const area = (upper: (q: (typeof pts)[number]) => number) =>
+    pts.length < 2
+      ? ''
+      : pts.map((q, k) => `${k ? 'L' : 'M'}${x(q.i).toFixed(1)},${y(upper(q)).toFixed(1)}`).join('') +
+        [...pts]
+          .reverse()
+          .map((q) => `L${x(q.i).toFixed(1)},${y(q.net).toFixed(1)}`)
+          .join('') +
+        'Z'
+  return {
+    gain: area((q) => Math.max(q.total, q.net)),
+    loss: area((q) => Math.min(q.total, q.net)),
+  }
 }

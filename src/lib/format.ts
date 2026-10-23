@@ -51,7 +51,7 @@ export function fmt_signed_money(v: number | null, currency: string, hide = fals
 /** Taiwan convention: red = up, green = down */
 export function pnl_color(v: number | null): string {
   if (v == null || v === 0) return 'text-slate-400'
-  return v > 0 ? 'text-rose-400' : 'text-emerald-400'
+  return v > 0 ? 'text-gain' : 'text-loss'
 }
 
 export function fmt_time(ms: number | null): string {

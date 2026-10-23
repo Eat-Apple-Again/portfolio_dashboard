@@ -59,6 +59,32 @@ export function save_hide_amounts(hide: boolean): void {
   }
 }
 
+const PNL_STYLE_KEY = 'portfolio_dashboard_pnl_style'
+
+/** 'tw' = red up / green down, 'us' = green up / red down */
+export type PnlStyle = 'tw' | 'us'
+
+export function load_pnl_style(): PnlStyle {
+  try {
+    return localStorage.getItem(PNL_STYLE_KEY) === 'us' ? 'us' : 'tw'
+  } catch {
+    return 'tw'
+  }
+}
+
+export function save_pnl_style(style: PnlStyle): void {
+  try {
+    localStorage.setItem(PNL_STYLE_KEY, style)
+  } catch {
+    // ignore
+  }
+}
+
+/** Applied on <html> so every gain / loss color switches at once */
+export function apply_pnl_style(style: PnlStyle): void {
+  document.documentElement.dataset.pnl = style
+}
+
 const COLLAPSED_KEY = 'portfolio_dashboard_collapsed'
 
 /** Which dashboard sections are collapsed (UI only, no asset data) */

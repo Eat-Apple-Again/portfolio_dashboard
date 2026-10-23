@@ -11,6 +11,8 @@ export interface Holding {
   currency: string
   account: string
   sheet_price: number | null
+  /** Expected annual return in percent (8 = 8%), used by the forecast */
+  expected_return?: number | null
   note: string
 }
 
@@ -23,7 +25,10 @@ export interface Account {
   opening_date: string | null
   /** Broker (holdings.account) that settles through this cash account */
   broker: string
-  /** Optional chart grouping for bank accounts, e.g. an emergency fund */
+  /**
+   * Investment purpose: a holding account name (cash waiting to be invested there), another name
+   * (a standalone reserve such as 總儲備), or blank (outside the investment scope)
+   */
   group: string
   note: string
 }

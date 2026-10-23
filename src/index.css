@@ -1,7 +1,21 @@
 @import "tailwindcss";
 
+/* Gain / loss colors follow the chosen convention (text-gain, text-loss, var(--gain), var(--loss)) */
+@theme inline {
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+}
+
 :root {
   color-scheme: dark;
+  /* Taiwan convention: red up, green down */
+  --gain: #fb7185;
+  --loss: #34d399;
+}
+
+:root[data-pnl='us'] {
+  --gain: #34d399;
+  --loss: #fb7185;
 }
 
 body {

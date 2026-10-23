@@ -24,7 +24,6 @@ export function AccountsSection({ accounts, subtotal_twd, hide }: Props) {
   const is_empty = (a: AccountBalance) => Math.abs(a.balance) < EPS && Math.abs(a.pending) < EPS
   const zero_count = accounts.filter(is_empty).length
   const visible = show_zero ? accounts : accounts.filter((a) => !is_empty(a))
-  const has_pending = accounts.some((a) => Math.abs(a.pending) > EPS)
 
   return (
     <SectionCard
@@ -89,12 +88,6 @@ export function AccountsSection({ accounts, subtotal_twd, hide }: Props) {
         >
           {show_zero ? '隱藏零餘額帳戶' : `顯示 ${zero_count} 個零餘額帳戶`}
         </button>
-      )}
-
-      {has_pending && (
-        <p className="px-5 pt-1 pb-2 text-xs text-slate-500">
-          餘額為實際入扣帳後的金額；待交割款會在交割日入扣帳。總資產以「可用」金額計算，避免與已入帳的持股重複計算。
-        </p>
       )}
     </SectionCard>
   )

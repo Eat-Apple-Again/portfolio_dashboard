@@ -1,4 +1,5 @@
 import type {
+  Account,
   AccountBalance,
   AccountGroup,
   Holding,
@@ -324,4 +325,15 @@ function build_groups(holdings: Holding[], positions: Position[], accounts: Acco
 
   for (const g of groups.values()) g.positions.sort((a, b) => (b.value_twd ?? 0) - (a.value_twd ?? 0))
   return [...groups.values()].filter((g) => g.positions.length > 0 || g.cash.length > 0)
+}
+
+/**
+ * Which investment bucket an account's cash belongs to, or null when it is outside the investment scope.
+ * Broker / exchange cash and settlement accounts join their broker; otherwise `group` decides
+ * (a holding account name = cash waiting to be invested there, any other name = a standalone reserve).
+ */
+export function invest_bucket(a: Account): string | null {
+  if (a.type === 'BROKER' || a.type === 'EXCHANGE') return a.broker || a.account
+  if (a.broker) return a.broker
+  return a.group || null
 }
