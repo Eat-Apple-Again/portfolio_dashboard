@@ -87,7 +87,7 @@ export function ForecastChart({ series, hide }: { series: ChartSeries[]; hide: b
   const start_month = series[0]?.result.start_month
   const label_of = (i: number) => {
     const d = new Date(start_month!.getFullYear(), start_month!.getMonth() + i, 1)
-    return `${d.getFullYear()}/${d.getMonth() + 1}（第 ${(i / 12).toFixed(1)} 年）`
+    return `${d.getFullYear()}/${d.getMonth() + 1} (第 ${(i / 12).toFixed(1)} 年)`
   }
 
   const idx = active != null ? Math.min(active, n - 1) : null
@@ -171,21 +171,21 @@ export function ForecastChart({ series, hide }: { series: ChartSeries[]; hide: b
           <p className="mb-1 text-slate-400">{label_of(idx)}</p>
           {single ? (
             <>
-              <Row label="樂觀（90%）" value={fmt_money(single.result.p90[idx], 'TWD', hide)} />
-              <Row label="偏多（75%）" value={fmt_money(single.result.p75[idx], 'TWD', hide)} />
-              <Row color={single.color} label="中位數（50%）" value={fmt_money(single.result.p50[idx], 'TWD', hide)} />
-              <Row label="偏空（25%）" value={fmt_money(single.result.p25[idx], 'TWD', hide)} />
-              <Row label="悲觀（10%）" value={fmt_money(single.result.p10[idx], 'TWD', hide)} />
+              <Row label="樂觀 (90%)" value={fmt_money(single.result.p90[idx], 'TWD', hide)} />
+              <Row label="偏多 (75%)" value={fmt_money(single.result.p75[idx], 'TWD', hide)} />
+              <Row color={single.color} label="中位數 (50%)" value={fmt_money(single.result.p50[idx], 'TWD', hide)} />
+              <Row label="偏空 (25%)" value={fmt_money(single.result.p25[idx], 'TWD', hide)} />
+              <Row label="悲觀 (10%)" value={fmt_money(single.result.p10[idx], 'TWD', hide)} />
               <Row color={PRINCIPAL} label="累計投入本金" value={fmt_money(single.result.contributed[idx], 'TWD', hide)} />
             </>
           ) : (
             <>
-              <p className="mb-0.5 text-slate-500">中位數（25%～75%）</p>
+              <p className="mb-0.5 text-slate-500">中位數 (25%～75%)</p>
               {series.map((s) => (
                 <Row
                   key={s.key}
                   color={s.color}
-                  label={`${s.label}（${hide ? '••' : compact.format(s.result.p25[idx])}～${hide ? '••' : compact.format(s.result.p75[idx])}）`}
+                  label={`${s.label} (${hide ? '••' : compact.format(s.result.p25[idx])}～${hide ? '••' : compact.format(s.result.p75[idx])})`}
                   value={fmt_money(s.result.p50[idx], 'TWD', hide)}
                 />
               ))}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fmt_money, fmt_signed_money } from '../lib/format'
 import type { AccountBalance } from '../types'
 import { SECTION_META } from './section_meta'
+import { AccountsInfo } from './info_content'
 import { SectionCard } from './section_card'
 
 const TYPE_LABEL: Record<string, string> = { BANK: '銀行', BROKER: '券商', EXCHANGE: '交易所' }
@@ -27,6 +28,7 @@ export function AccountsSection({ accounts, subtotal_twd, hide }: Props) {
 
   return (
     <SectionCard
+      info={<AccountsInfo />}
       id="accounts"
       title={
         <>

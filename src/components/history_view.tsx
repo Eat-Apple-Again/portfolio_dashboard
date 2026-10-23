@@ -5,6 +5,7 @@ import type { DailySeries } from '../lib/api'
 import type { Portfolio, SheetData } from '../types'
 import { HistoryChart, type ChartMode } from './history_chart'
 import { Segmented } from './form_fields'
+import { HistoryInfo } from './info_content'
 import { SERIES_COLORS } from './section_meta'
 import { apply_pnl_style, load_pnl_style, save_pnl_style } from '../lib/storage'
 
@@ -76,7 +77,7 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
       </div>
 
       <section className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-900 p-4 sm:grid-cols-4 sm:p-5">
-        <Stat label="投資總值" value={fmt_money(last?.total ?? 0, 'TWD', hide)} />
+        <Stat label="投資總值 (TWD)" value={fmt_money(last?.total ?? 0, 'TWD', hide)} />
         <Stat
           label="期間變化"
           value={fmt_signed_money(change, 'TWD', hide)}
@@ -94,7 +95,7 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
               mode === 'total'
                 ? [
                     { label: '投資總值', color: SERIES_COLORS[0] },
-                    { label: '淨投入（期初 + 轉入 − 轉出）', color: SERIES_COLORS[1] },
+                    { label: '淨投入 (期初 + 轉入 − 轉出)', color: SERIES_COLORS[1] },
                     { label: '賺', color: 'var(--gain)', box: true },
                     { label: '賠', color: 'var(--loss)', box: true },
                   ]
@@ -106,7 +107,7 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
               <button
                 type="button"
                 onClick={toggle_pnl_style}
-                title="切換漲跌顏色（台股 / 美股）"
+                title="切換漲跌顏色 (台股 / 美股)"
                 aria-label="切換漲跌顏色"
                 className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-sm hover:bg-slate-700"
               >
@@ -124,6 +125,7 @@ export function HistoryView({ sheet, portfolio, series, loading, error, hide }: 
                 on_change={set_mode}
               />
             </div>
+            <HistoryInfo />
           </div>
         </div>
 

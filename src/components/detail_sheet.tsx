@@ -43,23 +43,23 @@ export function DetailSheet({ position: p, hide, on_close }: Props) {
         </div>
 
         <dl className="mt-5 divide-y divide-slate-800 text-sm">
-          <Row label={`現價（${cur}）`}>{fmt_price(p.price)}</Row>
+          <Row label={`現價 (${cur})`}>{fmt_price(p.price)}</Row>
           <Row label="今日漲跌">
             <span className={pnl_color(p.day_change_pct)}>{fmt_pct(p.day_change_pct)}</span>
           </Row>
           <Row label="數量">{fmt_qty(h.quantity, hide)}</Row>
-          <Row label={`平均成本（${cur}）`}>{fmt_price(h.avg_cost)}</Row>
-          <Row label={`總成本（${cur}）`}>{fmt_money(p.cost, cur, hide)}</Row>
-          <Row label={`現值（${cur}）`}>{fmt_money(p.value, cur, hide)}</Row>
-          <Row label={`未實現損益（${cur}）`}>
+          <Row label={`平均成本 (${cur})`}>{fmt_price(h.avg_cost)}</Row>
+          <Row label={`總成本 (${cur})`}>{fmt_money(p.cost, cur, hide)}</Row>
+          <Row label={`現值 (${cur})`}>{fmt_money(p.value, cur, hide)}</Row>
+          <Row label={`未實現損益 (${cur})`}>
             <span className={pnl_color(p.pnl)}>
-              {fmt_signed_money(p.pnl, cur, hide)}（{fmt_pct(p.pnl_pct)}）
+              {fmt_signed_money(p.pnl, cur, hide)} ({fmt_pct(p.pnl_pct)})
             </span>
           </Row>
           {cur !== 'TWD' && (
             <>
-              <Row label="現值（TWD）">{fmt_money(p.value_twd, 'TWD', hide)}</Row>
-              <Row label="未實現損益（TWD）">
+              <Row label="現值 (TWD)">{fmt_money(p.value_twd, 'TWD', hide)}</Row>
+              <Row label="未實現損益 (TWD)">
                 <span className={pnl_color(p.pnl_twd)}>{fmt_signed_money(p.pnl_twd, 'TWD', hide)}</span>
               </Row>
             </>

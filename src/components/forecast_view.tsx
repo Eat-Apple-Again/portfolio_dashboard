@@ -18,6 +18,7 @@ import { load_forecast_settings, save_forecast_settings } from '../lib/storage'
 import type { Portfolio, SheetData } from '../types'
 import { ForecastChart, type ChartSeries } from './forecast_chart'
 import { Field, NumberInput, Segmented, Select } from './form_fields'
+import { ForecastBucketsInfo, ForecastChartInfo } from './info_content'
 import { SERIES_COLORS } from './section_meta'
 
 interface BonusForm {
@@ -221,17 +222,13 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
             <HorizonInput key={form.horizon} value={form.horizon} on_commit={(horizon) => update({ horizon })} />
           </div>
         </div>
-        <label className="flex items-center gap-2 pb-2 text-sm text-slate-300">
-          <input type="checkbox" checked={form.real} onChange={(e) => update({ real: e.target.checked })} />
-          扣除通膨（年 {form.inflation || 2}%）
-        </label>
         <button
           type="button"
           onClick={() => set_advanced(!advanced)}
           aria-expanded={advanced}
           className="pb-2 text-sm text-slate-400 hover:text-slate-200"
         >
-          進階設定 {advanced ? '▴' : '▾'}
+          進階設定{form.real && <span className="text-slate-500">・已扣通膨</span>} {advanced ? '▴' : '▾'}
         </button>
       </div>
       {advanced && (
@@ -244,6 +241,10 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
               on_change={(v) => update({ lookback: Number(v) })}
             />
           </div>
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-300">
+            <input type="checkbox" checked={form.real} onChange={(e) => update({ real: e.target.checked })} />
+            扣除通膨
+          </label>
           <div className="w-28">
             <Field label="通膨率 %">
               <NumberInput value={form.inflation} placeholder="2" onChange={(e) => update({ inflation: e.target.value })} />
@@ -254,9 +255,9 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
 
       <section className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-900 p-4 sm:grid-cols-4 sm:p-5">
         <Stat
-          label="預期年化（持股加權）"
+          label="預期年化 (持股加權)"
           value={fmt_pct(weighted_return(all_holdings, 0, settings), false)}
-          sub={`連同現金（以 0% 計）${fmt_pct(weighted_return(all_holdings, total_cash, settings), false)}`}
+          sub={`連同現金 (以 0% 計)${fmt_pct(weighted_return(all_holdings, total_cash, settings), false)}`}
         />
         <Stat
           label="歷史波動度"
@@ -264,7 +265,7 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
           sub={`投資總值 ${compact_money(total_now, hide)}`}
         />
         <Stat
-          label={`${form.horizon} 年後中位數（全部）`}
+          label={`${form.horizon} 年後中位數 (全部)`}
           value={compact_money(overall.p50[end], hide)}
           sub={`10%～90%：${compact_money(overall.p10[end], hide)}～${compact_money(overall.p90[end], hide)}`}
         />
@@ -276,12 +277,15 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
       </section>
 
       <section className="rounded-2xl bg-slate-900 p-4 sm:p-5">
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {['all', ...data.buckets.map((b) => `b:${b.name}`)].map((key) => (
-            <Chip key={key} slot={slot_of.get(key)} on_click={() => toggle(key)}>
-              {label_of(key)}
-            </Chip>
-          ))}
+        <div className="mb-3 flex items-start gap-2">
+          <div className="flex flex-1 flex-wrap gap-1.5">
+            {['all', ...data.buckets.map((b) => `b:${b.name}`)].map((key) => (
+              <Chip key={key} slot={slot_of.get(key)} on_click={() => toggle(key)}>
+                {label_of(key)}
+              </Chip>
+            ))}
+          </div>
+          <ForecastChartInfo />
         </div>
         {holding_rows.map((b) => (
           <div key={b.name} className="-mt-1 mb-3 flex flex-wrap items-center gap-1.5">
@@ -329,7 +333,10 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
 
       <section className="rounded-2xl bg-slate-900 py-2">
         <div className="grid grid-cols-[1.5fr_0.9fr_1fr] gap-x-3 px-5 py-2 text-right text-xs text-slate-500 sm:grid-cols-[1.5fr_1fr_0.9fr_1fr]">
-          <span className="text-left">部位</span>
+          <span className="flex items-center gap-2 text-left">
+            部位
+            <ForecastBucketsInfo />
+          </span>
           <span className="hidden sm:block">目前市值</span>
           <span>預期年化</span>
           <span>每月投入</span>
@@ -385,13 +392,25 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
               </button>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() => update({ bonuses: [...form.bonuses, { amount: '', month: 2, bucket: default_bucket }] })}
-            className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
-          >
-            ＋ 新增一筆
-          </button>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => update({ bonuses: [...form.bonuses, { amount: '', month: 2, bucket: default_bucket }] })}
+              className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+            >
+              ＋ 新增一筆
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                window.confirm('清除所有每月投入、預期 % 與每年額外投入？') &&
+                update({ contributions: {}, holding_amounts: {}, overrides: {}, bonuses: [] })
+              }
+              className="rounded-lg px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            >
+              重設
+            </button>
+          </div>
         </div>
       </section>
 
@@ -428,7 +447,7 @@ function BucketRows({ bucket: b, open, on_toggle, form, settings, update, hide }
             <span className="truncate">{b.name}</span>
           </span>
           <span className="block text-xs text-slate-500">
-            {b.kind === 'reserve' ? '儲備（不計利息）' : `${b.holdings.length} 檔`}
+            {b.kind === 'reserve' ? '儲備 (不計利息)' : `${b.holdings.length} 檔`}
             {b.cash_twd > 0 && b.kind === 'holding' && `・待投入 ${compact_money(b.cash_twd, hide)}`}
             {high && <span className="text-amber-400">・含 &gt;15%</span>}
           </span>
@@ -447,7 +466,7 @@ function BucketRows({ bucket: b, open, on_toggle, form, settings, update, hide }
       {open && (
         <li className="bg-slate-950/40 px-5 py-2">
           <div className="grid grid-cols-[1.5fr_0.9fr_1fr] gap-x-3 pb-1 text-right text-xs text-slate-500">
-            <span className="text-left">標的（歷史年化 ± 波動）</span>
+            <span className="text-left">標的 (歷史年化 ± 波動)</span>
             <span>預期 %</span>
             <span>每月投入</span>
           </div>
@@ -462,7 +481,7 @@ function BucketRows({ bucket: b, open, on_toggle, form, settings, update, hide }
                   {compact_money(h.value_twd, hide)}・
                   {h.hist_return != null
                     ? `${fmt_pct(h.hist_return, false)} ± ${fmt_pct(h.hist_vol, false)}`
-                    : `歷史不足（${h.months} 個月）`}
+                    : `歷史不足 (${h.months} 個月)`}
                 </span>
               </span>
               <NumberInput
@@ -496,7 +515,7 @@ function HorizonInput({ value, on_commit }: { value: number; on_commit: (years: 
       <span className="w-16">
         <NumberInput
           value={text}
-          aria-label={`自訂試算年數（1–${MAX_HORIZON}）`}
+          aria-label={`自訂試算年數 (1–${MAX_HORIZON})`}
           onChange={(e) => set_text(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}

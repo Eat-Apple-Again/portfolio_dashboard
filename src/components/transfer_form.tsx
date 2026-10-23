@@ -91,7 +91,7 @@ export function TransferForm({ accounts, presets, submitting, on_submit }: Props
 
   const account_options = accounts.map((acc) => (
     <option key={acc.account} value={acc.account}>
-      {acc.account}（{acc.currency}）
+      {acc.account} ({acc.currency})
     </option>
   ))
 
@@ -128,11 +128,11 @@ export function TransferForm({ accounts, presets, submitting, on_submit }: Props
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label={`金額${amount_cur ? `（${amount_cur}）` : ''}`}>
+        <Field label={`金額${amount_cur ? `(${amount_cur})` : ''}`}>
           <NumberInput value={amount} onChange={(e) => set_amount(e.target.value)} />
         </Field>
         {has_from && (
-          <Field label={`手續費${from_cur ? `（${from_cur}）` : ''}`} hint="另外從轉出帳戶扣除">
+          <Field label={`手續費${from_cur ? `(${from_cur})` : ''}`} hint="另外從轉出帳戶扣除">
             <NumberInput value={fee} onChange={(e) => set_fee(e.target.value)} placeholder="0" />
           </Field>
         )}
@@ -140,7 +140,7 @@ export function TransferForm({ accounts, presets, submitting, on_submit }: Props
 
       {cross && (
         <Field
-          label={`轉入金額（${to_cur}）`}
+          label={`轉入金額 (${to_cur})`}
           hint={
             a && ta && a > 0 && ta > 0 ? `換算匯率 ${fmt_price(Math.max(a, ta) / Math.min(a, ta))}` : '實際到帳金額'
           }

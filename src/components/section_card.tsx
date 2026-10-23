@@ -5,11 +5,13 @@ interface Props {
   id: string
   title: ReactNode
   right?: ReactNode
+  /** Rendered outside the toggle button (e.g. an info button) */
+  info?: ReactNode
   children: ReactNode
 }
 
 /** Card with a clickable header that collapses its body; collapsed state is remembered per device */
-export function SectionCard({ id, title, right, children }: Props) {
+export function SectionCard({ id, title, right, info, children }: Props) {
   const [open, set_open] = useState(() => !load_collapsed(id))
 
   const toggle = () => {
@@ -19,20 +21,23 @@ export function SectionCard({ id, title, right, children }: Props) {
 
   return (
     <section className="rounded-2xl bg-slate-900">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        className="flex w-full items-baseline justify-between gap-3 px-5 py-3 text-left"
-      >
-        <h2 className="flex items-center gap-2 font-semibold">
-          <span className={`inline-block text-xs text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`}>
-            ▶
-          </span>
-          {title}
-        </h2>
-        {right && <span className="text-sm tabular-nums text-slate-400">{right}</span>}
-      </button>
+      <div className="flex items-center gap-2 px-5">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-baseline justify-between gap-3 py-3 text-left"
+        >
+          <h2 className="flex items-center gap-2 font-semibold">
+            <span className={`inline-block text-xs text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`}>
+              ▶
+            </span>
+            {title}
+          </h2>
+          {right && <span className="text-sm tabular-nums text-slate-400">{right}</span>}
+        </button>
+        {info}
+      </div>
       {open && <div className="@container pb-2">{children}</div>}
     </section>
   )

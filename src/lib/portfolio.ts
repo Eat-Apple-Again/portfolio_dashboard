@@ -113,7 +113,7 @@ export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: numb
   const pos_key = (account: string, symbol: string) => `${account}|${symbol}`
   for (const h of data.holdings) {
     if (h.type === 'CASH') {
-      warnings.push(`holdings 的 CASH 列（${h.symbol}）已改由 accounts 管理，請刪除`)
+      warnings.push(`holdings 的 CASH 列 (${h.symbol}) 已改由 accounts 管理，請刪除`)
       continue
     }
     if (!INVEST_TYPES.includes(h.type as InvestType)) continue

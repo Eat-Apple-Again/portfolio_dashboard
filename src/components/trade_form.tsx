@@ -124,7 +124,7 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
     const problems: string[] = []
     if (is_new) {
       const rule = NEW_HOLDING_RULES[new_type]
-      if (!rule.symbol.test(new_symbol)) problems.push(`代號格式不符（例如 ${rule.example}）`)
+      if (!rule.symbol.test(new_symbol)) problems.push(`代號格式不符 (例如 ${rule.example})`)
       if (!rule.quote_id.test(new_quote_id)) problems.push('報價代號格式不符')
       if (symbols.some((h) => h.symbol === new_symbol)) problems.push('這個標的已存在，請直接從清單選擇')
     } else if (!holding) {
@@ -136,7 +136,7 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
     if (action !== 'DIVIDEND' && !(p != null && p > 0)) problems.push('價格必須大於 0')
     if ([f, t].some((v) => Number.isNaN(v) || v < 0)) problems.push('手續費 / 稅必須是非負數')
     if (amount_value == null || Number.isNaN(amount_value) || amount_value <= 0) problems.push('金額必須大於 0')
-    if (!cash_account) problems.push(`accounts 尚未設定「${broker}」的交割帳戶（broker 欄）`)
+    if (!cash_account) problems.push(`accounts 尚未設定「${broker}」的交割帳戶 (broker 欄)`)
     if (problems.length) return set_error(problems.join('、'))
 
     set_error(null)
@@ -226,7 +226,7 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
             onChange={(e) => set_trade_date(input_to_compact(e.target.value))}
           />
         </Field>
-        <Field label="交割日" hint={currency === 'TWD' ? '預設 T+2（未排除國定假日）' : '預設為成交日'}>
+        <Field label="交割日" hint={currency === 'TWD' ? '預設 T+2 (未排除國定假日)' : '預設為成交日'}>
           <TextInput
             type="date"
             value={compact_to_input(settle_date)}
@@ -237,10 +237,10 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
 
       {action !== 'DIVIDEND' && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="數量" hint={is_crypto && action === 'BUY' ? '實際到帳數量（扣除手續費後）' : undefined}>
+          <Field label="數量" hint={is_crypto && action === 'BUY' ? '實際到帳數量 (扣除手續費後)' : undefined}>
             <NumberInput value={quantity} onChange={(e) => set_quantity(e.target.value)} />
           </Field>
-          <Field label={`價格（${currency}）`}>
+          <Field label={`價格 (${currency})`}>
             <NumberInput value={price} onChange={(e) => set_price(e.target.value)} />
           </Field>
           <Field label="手續費">
@@ -253,12 +253,12 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
       )}
 
       <Field
-        label={`${action === 'BUY' ? '實付' : '實收'}金額（${currency}）`}
+        label={`${action === 'BUY' ? '實付' : '實收'}金額 (${currency})`}
         hint={
           action === 'DIVIDEND'
-            ? '實際入帳金額（扣除預扣稅後）'
+            ? '實際入帳金額 (扣除預扣稅後)'
             : is_crypto && action === 'BUY'
-              ? '花費的 USDT（委託價值）。留空則自動計算'
+              ? '花費的 USDT (委託價值)。留空則自動計算'
               : '留空則自動計算；可改成券商 App 上的實際金額'
         }
       >
@@ -274,7 +274,7 @@ export function TradeForm({ holdings, accounts, submitting, on_submit }: Props) 
         {cash_account ? (
           <span className="text-slate-200">{cash_account}</span>
         ) : (
-          <span className="text-rose-400">未設定（請在 accounts 的 broker 欄填入「{broker}」）</span>
+          <span className="text-rose-400">未設定 (請在 accounts 的 broker 欄填入「{broker}」)</span>
         )}
       </p>
 

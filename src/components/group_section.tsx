@@ -41,7 +41,7 @@ export function GroupSection({ group, hide, on_select }: Props) {
           <span>現價</span>
           <span>今日</span>
           <span>現值</span>
-          <span>損益</span>
+          <span>未實現損益</span>
         </div>
       )}
 
@@ -57,8 +57,8 @@ export function GroupSection({ group, hide, on_select }: Props) {
                 <p className="truncate font-medium">{p.holding.name || p.holding.symbol}</p>
                 <p className="truncate text-xs text-slate-500">
                   {p.holding.symbol}
-                  {p.price_source === 'sheet' && <span className="ml-1 text-amber-400">（試算表報價）</span>}
-                  {p.price_source === 'none' && <span className="ml-1 text-rose-400">（無報價）</span>}
+                  {p.price_source === 'sheet' && <span className="ml-1 text-amber-400">(試算表報價)</span>}
+                  {p.price_source === 'none' && <span className="ml-1 text-rose-400">(無報價)</span>}
                 </p>
               </div>
               <PositionCells p={p} hide={hide} />
@@ -101,7 +101,7 @@ function PositionCells({ p, hide }: { p: Position; hide: boolean }) {
 /** Broker / exchange cash, e.g. brokerage USD cash or exchange USDT */
 function CashRow({ a, hide }: { a: AccountBalance; hide: boolean }) {
   const cur = a.account.currency
-  const label = a.account.type === 'EXCHANGE' ? 'USDT' : `現金（${cur}）`
+  const label = a.account.type === 'EXCHANGE' ? 'USDT' : `現金 (${cur})`
   const pending = Math.abs(a.pending) > EPS
 
   return (
