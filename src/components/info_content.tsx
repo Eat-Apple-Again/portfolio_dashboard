@@ -92,7 +92,7 @@ export function ForecastChartInfo() {
       <ul>
         <li>試算年數: 上方按鈕，或自訂 1～40 年</li>
         <li>每月投入、預期 %、每年額外投入: 下方部位表</li>
-        <li>進階設定: 扣除通膨、通膨率、波動參考期間</li>
+        <li>進階設定: 波動參考期間、預設 APY 年化報酬率、扣除通膨、通膨率</li>
         <li>波動參考期間只影響漲跌幅度，不影響平均報酬</li>
       </ul>
     </InfoButton>
@@ -105,7 +105,7 @@ export function ForecastBucketsInfo() {
       <ul>
         <li><b>預期年化</b>: 部位內現有持股的預期 % 以市值加權，不含現金</li>
         <li><b>預期 %</b> 依序取: 這裡輸入 → holdings 的 expected_return → 預設值</li>
-        <li>預設值: 台股 7%、美股 8%、加密 10%</li>
+        <li>預設值: 進階設定的預設 APY 年化報酬率，初始為台股 8%、美股 10%、加密貨幣 10%</li>
         <li><b>歷史年化 ± 波動</b>: 該標的過去 5 或 10 年的實際表現</li>
       </ul>
       <h4>每月投入的兩種填法</h4>

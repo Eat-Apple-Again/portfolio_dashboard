@@ -6,14 +6,22 @@ const MIN_MONTHS = 24 // below this a holding's history is too short to bootstra
 
 // Fallback assumptions when no expected return is set and history is short (annual return, annual volatility)
 const FALLBACK: Record<string, { ret: number; vol: number }> = {
-  TW_STOCK: { ret: 0.07, vol: 0.2 },
-  US_STOCK: { ret: 0.08, vol: 0.2 },
+  TW_STOCK: { ret: 0.08, vol: 0.2 },
+  US_STOCK: { ret: 0.1, vol: 0.2 },
   CRYPTO: { ret: 0.1, vol: 0.7 },
 }
+
+/** Market types that have a default expected return, editable in the forecast's advanced settings */
+export const MARKET_TYPES = ['TW_STOCK', 'US_STOCK', 'CRYPTO'] as const
+
+export const DEFAULT_RETURNS: Record<string, number> = Object.fromEntries(
+  MARKET_TYPES.map((t) => [t, FALLBACK[t].ret]),
+)
 
 export interface HoldingStats {
   key: string // `${bucket}|${symbol}`
   bucket: string
+  type: string
   symbol: string
   name: string
   value_twd: number
@@ -51,6 +59,8 @@ export interface ForecastSettings {
   allocations: Record<string, number>
   /** Expected annual return per holding key (fraction), overriding the sheet */
   overrides: Record<string, number>
+  /** Per market type (fraction), used when a holding has no expected return set */
+  default_returns: Record<string, number>
   /** Extra yearly contributions, e.g. year-end bonus */
   bonuses: Bonus[]
 }
@@ -124,6 +134,7 @@ export function build_forecast_data(
         return {
           key: `${g.account}|${p.holding.symbol}`,
           bucket: g.account,
+          type: p.holding.type,
           symbol: p.holding.symbol,
           name: p.holding.name || p.holding.symbol,
           value_twd: p.value_twd!,
@@ -144,8 +155,13 @@ export function build_forecast_data(
   return { months: ret_months, buckets }
 }
 
+/** Expected return before any per-holding override: sheet value, else the market default */
+export function base_return(h: HoldingStats, s: ForecastSettings): number {
+  return h.sheet_return ?? s.default_returns[h.type] ?? h.fallback.ret
+}
+
 export function expected_return(h: HoldingStats, s: ForecastSettings): number {
-  return s.overrides[h.key] ?? h.sheet_return ?? h.fallback.ret
+  return s.overrides[h.key] ?? base_return(h, s)
 }
 
 export function bucket_value(b: Bucket): number {

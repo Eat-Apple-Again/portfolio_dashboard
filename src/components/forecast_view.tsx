@@ -2,9 +2,12 @@ import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from '
 import type { DailySeries } from '../lib/api'
 import {
   allocation,
+  base_return,
   bucket_value,
   build_forecast_data,
+  DEFAULT_RETURNS,
   expected_return,
+  MARKET_TYPES,
   simulate,
   weighted_return,
   weighted_vol,
@@ -37,6 +40,8 @@ interface FormState {
   /** Monthly TWD per holding key; when any is set, the bucket's contribution is their sum */
   holding_amounts: Record<string, string>
   overrides: Record<string, string>
+  /** Default expected return % per market type */
+  market_returns: Record<string, string>
   bonuses: BonusForm[]
 }
 
@@ -48,8 +53,11 @@ const DEFAULTS: FormState = {
   contributions: {},
   holding_amounts: {},
   overrides: {},
+  market_returns: {},
   bonuses: [],
 }
+
+const MARKET_LABEL: Record<string, string> = { TW_STOCK: '台股', US_STOCK: '美股', CRYPTO: '加密貨幣' }
 
 const MAX_HORIZON = 40
 const HORIZON_PRESETS = [5, 10, 20, 30]
@@ -153,6 +161,7 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
       },
       allocations: amounts,
       overrides: num_map(form.overrides, 0.01),
+      default_returns: { ...DEFAULT_RETURNS, ...num_map(form.market_returns, 0.01) },
       bonuses: form.bonuses
         .map((b) => ({
           amount: parse_num(b.amount) || 0,
@@ -232,7 +241,8 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
         </button>
       </div>
       {advanced && (
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl bg-slate-900/60 px-4 py-3">
+        // Every group: one heading row + one control row, so headings and controls line up
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-4 rounded-xl bg-slate-900/60 px-4 py-3">
           <div className="w-44">
             <p className="mb-1 text-xs text-slate-400">波動參考期間</p>
             <Segmented
@@ -241,14 +251,38 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
               on_change={(v) => update({ lookback: Number(v) })}
             />
           </div>
-          <label className="flex items-center gap-2 pb-2 text-sm text-slate-300">
-            <input type="checkbox" checked={form.real} onChange={(e) => update({ real: e.target.checked })} />
-            扣除通膨
-          </label>
-          <div className="w-28">
-            <Field label="通膨率 %">
-              <NumberInput value={form.inflation} placeholder="2" onChange={(e) => update({ inflation: e.target.value })} />
-            </Field>
+          <div>
+            <p className="mb-1 text-xs text-slate-400">預設 APY 年化報酬率 (%)</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {MARKET_TYPES.map((t) => (
+                <label key={t} className="flex items-center gap-2 text-sm text-slate-300">
+                  {MARKET_LABEL[t]}
+                  <span className="w-16">
+                    <NumberInput
+                      value={form.market_returns[t] ?? ''}
+                      placeholder={String(DEFAULT_RETURNS[t] * 100)}
+                      onChange={(e) => update({ market_returns: { ...form.market_returns, [t]: e.target.value } })}
+                    />
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-400">通膨</p>
+            <div className="flex items-center gap-4 text-sm text-slate-300">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.real} onChange={(e) => update({ real: e.target.checked })} />
+                扣除通膨
+              </label>
+              <label className="flex items-center gap-2">
+                年
+                <span className="w-16">
+                  <NumberInput value={form.inflation} placeholder="2" onChange={(e) => update({ inflation: e.target.value })} />
+                </span>
+                %
+              </label>
+            </div>
           </div>
         </div>
       )}
@@ -257,7 +291,7 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
         <Stat
           label="預期年化 (持股加權)"
           value={fmt_pct(weighted_return(all_holdings, 0, settings), false)}
-          sub={`連同現金 (以 0% 計)${fmt_pct(weighted_return(all_holdings, total_cash, settings), false)}`}
+          sub={`連同現金 (以 0% 計) ${fmt_pct(weighted_return(all_holdings, total_cash, settings), false)}`}
         />
         <Stat
           label="歷史波動度"
@@ -267,7 +301,7 @@ export function ForecastView({ sheet, portfolio, series, loading, error, hide }:
         <Stat
           label={`${form.horizon} 年後中位數 (全部)`}
           value={compact_money(overall.p50[end], hide)}
-          sub={`10%～90%：${compact_money(overall.p10[end], hide)}～${compact_money(overall.p90[end], hide)}`}
+          sub={`10%～90%: ${compact_money(overall.p10[end], hide)}～${compact_money(overall.p90[end], hide)}`}
         />
         <Stat
           label="累計投入本金"
@@ -486,7 +520,7 @@ function BucketRows({ bucket: b, open, on_toggle, form, settings, update, hide }
               </span>
               <NumberInput
                 value={form.overrides[h.key] ?? ''}
-                placeholder={((h.sheet_return ?? h.fallback.ret) * 100).toFixed(1)}
+                placeholder={(base_return(h, settings) * 100).toFixed(1)}
                 onChange={(e) => update({ overrides: { ...form.overrides, [h.key]: e.target.value } })}
               />
               <NumberInput
