@@ -74,6 +74,7 @@ function get_all_() {
     currency: str_(r.currency).toUpperCase(),
     account: str_(r.account),
     sheet_price: num_(r.sheet_price),
+    expected_return: num_(r.expected_return),
     note: str_(r.note),
   }));
 
