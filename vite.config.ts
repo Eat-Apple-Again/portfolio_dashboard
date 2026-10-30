@@ -29,7 +29,8 @@ function csp_plugin(): Plugin {
 }
 
 export default defineConfig({
-  base: '/portfolio_dashboard/',
+  // Relative asset paths: works under any repo name or custom domain without changes
+  base: './',
   plugins: [
     react(),
     tailwindcss(),
