@@ -2,6 +2,7 @@ import type {
   Account,
   AccountBalance,
   AccountGroup,
+  CashEntry,
   Holding,
   InvestType,
   Portfolio,
@@ -91,13 +92,23 @@ export interface ReplayState {
   warnings: string[]
 }
 
+/** Per-account cash movements, filled only when requested (history replays skip it) */
+export type Ledger = Map<string, CashEntry[]>
+
 /**
  * Opening snapshot (holdings + accounts) + events up to `now`.
  * - Positions change on the trade date (moving-average cost; sells keep the average)
  * - Cash changes on settle_date; settlements after `now` are reported as pending
+ * - `ledger` records each applied cash change, so statements always match balances
  */
-export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: number): ReplayState {
+export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: number, ledger?: Ledger): ReplayState {
   const warnings: string[] = []
+  const log = (account: string, e: CashEntry) => {
+    if (!ledger) return
+    const list = ledger.get(account)
+    if (list) list.push(e)
+    else ledger.set(account, [e])
+  }
   // Opening date per cash account; trades are dated against their cash account
   const opening = new Map<string, number>()
   const cash = new Map<string, CashState>()
@@ -130,7 +141,7 @@ export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: numb
     .map((t) => ({ t, ts: to_ts(t.trade_date) }))
     .sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0))
 
-  for (const { t, ts } of trades) {
+  for (const [i, { t, ts }] of trades.entries()) {
     const label = `${t.account} ${t.symbol}`
     if (ts == null || t.amount == null) {
       warnings.push(`trades「${label}」缺少 trade_date 或 amount，已略過`)
@@ -170,17 +181,31 @@ export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: numb
     const settle_ts = to_ts(t.settle_date) ?? ts
     if (settle_ts >= start) {
       const delta = t.action === 'BUY' ? -t.amount : t.amount
-      if (settle_ts <= now) cash_state.balance += delta
+      const pending = settle_ts > now
+      if (!pending) cash_state.balance += delta
       else {
         cash_state.pending += delta
         if (delta < 0 && (cash_state.next_debit_ts == null || settle_ts < cash_state.next_debit_ts)) {
           cash_state.next_debit_ts = settle_ts
         }
       }
+      log(t.cash_account, {
+        key: `t:${t.id || i}`,
+        ts: settle_ts,
+        kind: t.action === 'BUY' ? 'BUY' : t.action === 'SELL' ? 'SELL' : 'DIVIDEND',
+        delta,
+        pending,
+        counterparty: t.account,
+        symbol: t.symbol,
+        quantity: t.quantity,
+        fee: null,
+        rate: null,
+        note: t.note,
+      })
     }
   }
 
-  for (const tr of data.transfers) {
+  for (const [i, tr] of data.transfers.entries()) {
     const ts = to_ts(tr.datetime)
     const label = `${tr.from_account || '收入'} → ${tr.to_account || '支出'}`
     if (ts == null || tr.amount == null) {
@@ -195,8 +220,32 @@ export function replay(data: Omit<SheetData, 'quotes' | 'updated_at'>, now: numb
       warnings.push(`transfers「${label}」的帳戶不在 accounts 中`)
       continue
     }
-    if (from && ts >= opening.get(tr.from_account)!) from.balance -= tr.amount + (tr.fee ?? 0)
-    if (to && ts >= opening.get(tr.to_account)!) to.balance += tr.to_amount ?? tr.amount
+    const rate = tr.to_amount && tr.to_amount !== tr.amount ? tr.amount / tr.to_amount : null
+    const base = { ts, pending: false, symbol: '', quantity: null, rate, note: tr.note }
+    if (from && ts >= opening.get(tr.from_account)!) {
+      const delta = -(tr.amount + (tr.fee ?? 0))
+      from.balance += delta
+      log(tr.from_account, {
+        ...base,
+        key: `x:${tr.id || i}:out`,
+        kind: to ? 'TRANSFER_OUT' : 'EXPENSE',
+        delta,
+        counterparty: tr.to_account,
+        fee: tr.fee,
+      })
+    }
+    if (to && ts >= opening.get(tr.to_account)!) {
+      const delta = tr.to_amount ?? tr.amount
+      to.balance += delta
+      log(tr.to_account, {
+        ...base,
+        key: `x:${tr.id || i}:in`,
+        kind: from ? 'TRANSFER_IN' : 'INCOME',
+        delta,
+        counterparty: tr.from_account,
+        fee: null,
+      })
+    }
   }
 
   return { positions, cash, warnings }
@@ -208,7 +257,8 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
   const warnings: string[] = []
   if (fx.rate == null) warnings.push('找不到 USD/TWD 匯率，美元資產無法換算成台幣')
 
-  const state = replay(data, now)
+  const ledger: Ledger = new Map()
+  const state = replay(data, now, ledger)
   const { positions, cash } = state
   warnings.push(...state.warnings)
 
@@ -240,6 +290,7 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
         balance_twd: to_twd(balance, a.currency, fx.rate),
         available_twd: to_twd(available, a.currency, fx.rate),
         next_debit_ts,
+        entries: ledger.get(a.account) ?? [],
       }
     })
 
@@ -336,4 +387,21 @@ export function invest_bucket(a: Account): string | null {
   if (a.type === 'BROKER' || a.type === 'EXCHANGE') return a.broker || a.account
   if (a.broker) return a.broker
   return a.group || null
+}
+
+export interface StatementRow {
+  entry: CashEntry
+  /** Balance right after this entry; pending rows continue from today's balance */
+  balance: number
+}
+
+/** Account statement, newest first: opening balance + settled entries, then pending settlements */
+export function build_statement(a: AccountBalance): StatementRow[] {
+  const by_time = (x: CashEntry, y: CashEntry) => x.ts - y.ts
+  const ordered = [
+    ...a.entries.filter((e) => !e.pending).sort(by_time),
+    ...a.entries.filter((e) => e.pending).sort(by_time),
+  ]
+  let balance = a.account.opening_balance ?? 0
+  return ordered.map((entry) => ({ entry, balance: (balance += entry.delta) })).reverse()
 }

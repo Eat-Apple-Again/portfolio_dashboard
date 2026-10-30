@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { fmt_money, fmt_signed_money } from '../lib/format'
 import type { AccountBalance } from '../types'
-import { SECTION_META } from './section_meta'
+import { ACCOUNT_TYPE_LABEL, SECTION_META } from './section_meta'
 import { AccountsInfo } from './info_content'
 import { SectionCard } from './section_card'
-
-const TYPE_LABEL: Record<string, string> = { BANK: '銀行', BROKER: '券商', EXCHANGE: '交易所' }
 
 // Container query: table columns only when the card itself is wide enough
 const GRID = 'grid grid-cols-[1fr_auto] @lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-x-3'
@@ -15,10 +13,11 @@ interface Props {
   accounts: AccountBalance[]
   subtotal_twd: number
   hide: boolean
+  on_select: (a: AccountBalance) => void
 }
 
 /** Balance = money actually in the account; pending = settlements not yet debited/credited */
-export function AccountsSection({ accounts, subtotal_twd, hide }: Props) {
+export function AccountsSection({ accounts, subtotal_twd, hide, on_select }: Props) {
   const [show_zero, set_show_zero] = useState(false)
   if (accounts.length === 0) return null
 
@@ -51,32 +50,38 @@ export function AccountsSection({ accounts, subtotal_twd, hide }: Props) {
           const cur = a.account.currency
           const pending = Math.abs(a.pending) > EPS
           return (
-            <li key={a.account.account} className={`${GRID} items-center px-5 py-2`}>
-              <div className="min-w-0">
-                <p className="truncate font-medium">{a.account.account}</p>
-                <p className="truncate text-xs text-slate-500">
-                  {TYPE_LABEL[a.account.type] ?? a.account.type} · {cur}
-                </p>
-              </div>
-
-              {/* narrow */}
-              <div className="text-right tabular-nums @lg:hidden">
-                <p>{fmt_money(a.balance, cur, hide)}</p>
-                {pending && (
-                  <p className="text-xs text-amber-400">
-                    待交割 {fmt_signed_money(a.pending, cur, hide)}・可用 {fmt_money(a.available, cur, hide)}
+            <li key={a.account.account}>
+              <button
+                type="button"
+                onClick={() => on_select(a)}
+                className={`${GRID} w-full items-center px-5 py-2 text-left hover:bg-slate-800/60 active:bg-slate-800`}
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{a.account.account}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {ACCOUNT_TYPE_LABEL[a.account.type] ?? a.account.type} · {cur}
                   </p>
-                )}
-              </div>
+                </div>
 
-              {/* wide */}
-              <span className="hidden text-right tabular-nums @lg:block">{fmt_money(a.balance, cur, hide)}</span>
-              <span className={`hidden text-right tabular-nums @lg:block ${pending ? 'text-amber-400' : 'text-slate-600'}`}>
-                {pending ? fmt_signed_money(a.pending, cur, hide) : '—'}
-              </span>
-              <span className="hidden text-right tabular-nums text-slate-400 @lg:block">
-                {fmt_money(a.balance_twd, 'TWD', hide)}
-              </span>
+                {/* narrow */}
+                <div className="text-right tabular-nums @lg:hidden">
+                  <p>{fmt_money(a.balance, cur, hide)}</p>
+                  {pending && (
+                    <p className="text-xs text-amber-400">
+                      待交割 {fmt_signed_money(a.pending, cur, hide)}・可用 {fmt_money(a.available, cur, hide)}
+                    </p>
+                  )}
+                </div>
+
+                {/* wide */}
+                <span className="hidden text-right tabular-nums @lg:block">{fmt_money(a.balance, cur, hide)}</span>
+                <span className={`hidden text-right tabular-nums @lg:block ${pending ? 'text-amber-400' : 'text-slate-600'}`}>
+                  {pending ? fmt_signed_money(a.pending, cur, hide) : '—'}
+                </span>
+                <span className="hidden text-right tabular-nums text-slate-400 @lg:block">
+                  {fmt_money(a.balance_twd, 'TWD', hide)}
+                </span>
+              </button>
             </li>
           )
         })}

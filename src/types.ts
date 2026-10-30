@@ -122,6 +122,28 @@ export interface AccountBalance {
   available_twd: number | null
   /** Earliest future settlement debit, for shortfall alerts */
   next_debit_ts: number | null
+  /** Every cash movement applied by replay, in replay order */
+  entries: CashEntry[]
+}
+
+export type CashEntryKind = 'BUY' | 'SELL' | 'DIVIDEND' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'INCOME' | 'EXPENSE'
+
+export interface CashEntry {
+  key: string
+  /** Settle date for trades, datetime for transfers */
+  ts: number
+  kind: CashEntryKind
+  /** Signed change in this account's currency (fees included) */
+  delta: number
+  pending: boolean
+  /** Holding account for trades; the other cash account for transfers */
+  counterparty: string
+  symbol: string
+  quantity: number | null
+  fee: number | null
+  /** Cross-currency transfers: from amount per to amount */
+  rate: number | null
+  note: string
 }
 
 export interface Shortfall {

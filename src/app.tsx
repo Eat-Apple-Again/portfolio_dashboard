@@ -1,4 +1,5 @@
 import { useEffect, useState, type ButtonHTMLAttributes } from 'react'
+import { AccountSheet } from './components/account_sheet'
 import { AccountsSection } from './components/accounts_section'
 import { DetailSheet } from './components/detail_sheet'
 import { EntrySheet } from './components/entry_sheet'
@@ -79,6 +80,7 @@ function Dashboard({
   const { sheet, portfolio, loading, error, unauthorized, fetched_at, refresh } = usePortfolio(credentials)
   const [hide, set_hide] = useState(load_hide_amounts)
   const [selected_key, set_selected_key] = useState<string | null>(null)
+  const [selected_account, set_selected_account] = useState<string | null>(null)
   const [entry_open, set_entry_open] = useState(false)
   const [view, go] = useView()
   const history = useHistory(credentials, sheet, view === 'history')
@@ -87,6 +89,9 @@ function Dashboard({
   // Look up by key so the open detail sheet reflects refreshed prices
   const selected = selected_key
     ? (portfolio?.groups.flatMap((g) => g.positions).find((p) => position_key(p) === selected_key) ?? null)
+    : null
+  const account = selected_account
+    ? (portfolio?.accounts.find((a) => a.account.account === selected_account) ?? null)
     : null
 
   const toggle_hide = () => {
@@ -215,6 +220,7 @@ function Dashboard({
                 accounts={portfolio.accounts}
                 subtotal_twd={portfolio.accounts.reduce((s, a) => s + (a.available_twd ?? 0), 0)}
                 hide={hide}
+                on_select={(a) => set_selected_account(a.account.account)}
               />
               {sheet && <RecentRecords sheet={sheet} hide={hide} />}
             </div>
@@ -248,6 +254,7 @@ function Dashboard({
       </nav>
 
       {selected && <DetailSheet position={selected} hide={hide} on_close={() => set_selected_key(null)} />}
+      {account && <AccountSheet account={account} hide={hide} on_close={() => set_selected_account(null)} />}
 
       {entry_open && sheet && (
         <EntrySheet
