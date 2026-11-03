@@ -24,7 +24,7 @@
 
 | 頁面 | 內容 |
 |---|---|
-| **總覽** | 總資產、各帳戶持股與現金、未實現損益、交割款不足提醒 |
+| **總覽** | 總資產、資產分布 (點台股、美股、加密貨幣可看各標的占比)、各帳戶持股與現金、未實現損益、交割款不足提醒；點銀行帳戶可看逐筆明細與餘額，可篩選本月、本週、今天 |
 | **走勢** | 每日投資總值、累計損益、各部位組成 |
 | **試算** | 依預期年化與每月投入，模擬 N 年後的可能結果與機率 |
 | **記一筆** | 買進 / 賣出 / 股利、轉帳、收入、支出 |
@@ -36,13 +36,22 @@
 ### 1. Fork 並開啟 GitHub Pages
 
 1. 右上角 **Fork** → Create fork
-2. 若 repo 名稱不是 `portfolio_dashboard`：修改 [vite.config.ts](vite.config.ts) 的 `base: '/<repo 名稱>/'`
-3. **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**
-4. **Actions** 分頁 → 按「I understand my workflows, go ahead and enable them」 (fork 預設停用)
-5. 左側選 **Deploy to GitHub Pages** → **Run workflow**
-6. 完成後網址為 `https://<GitHub 帳號>.github.io/<repo 名稱>/`
+2. **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**
+3. **Actions** 分頁 → 按「I understand my workflows, go ahead and enable them」 (fork 預設停用)
+4. 左側選 **Deploy to GitHub Pages** → **Run workflow**
+5. 完成後網址為 `https://<GitHub 帳號>.github.io/<repo 名稱>/`
 
-> ⚠️ 同一 GitHub 帳號的所有 Pages 網站共用同一個網域，**其他 Pages 網站不要加入第三方 script**。
+> ⚠️ 同一 GitHub 帳號的所有 Pages 網站共用同一個網域，**其他 Pages 網站不要加入第三方 script**，或改用下方的自訂子網域。
+
+#### 自訂子網域 (選填)
+
+有自己的網域時，建議放在獨立子網域 (如 `dash.example.com`)，不與其他網站共用 origin：
+
+1. DNS 新增 `CNAME` 記錄：`dash` → `<GitHub 帳號>.github.io` (Cloudflare 選 **DNS only**)
+2. **Settings → Pages → Custom domain** 填入子網域 → 憑證發下來後勾選 **Enforce HTTPS**
+3. 換網域等於換 origin，需重新登入；請先在舊網址登出
+
+網頁使用相對路徑，repo 名稱或網域不同都不需修改程式；網域只存在 GitHub 設定與 DNS，不會出現在 repo。
 
 ### 2. 建立 Google 試算表
 
@@ -118,6 +127,8 @@
 | 現況 | 期初 (`holdings`、`accounts`)+ 之後的交易與轉帳 |
 | 持股 / 現金變動 | 持股在成交日、現金在交割日 |
 | 平均成本 | 移動平均 |
+| 持股分布 | 美股以 USD、加密貨幣以 USDT 顯示，並附上換算後的 TWD；同一標的分散在多個帳戶時合併計算；超過 8 檔時，較小的歸入「其他」 |
+| 帳戶明細 | 重算餘額時同步記下每筆現金變動，明細的最後餘額必定等於帳戶餘額；待交割排在最上面，接續算到「可用」 |
 | 投資損益 | 投資總值變化 − 淨轉入 (薪水、卡費等進出不算損益) |
 | 試算 | 以歷史月報酬重抽 2,000 種未來 (bootstrap Monte Carlo)，平均報酬調整為預期年化 |
 
@@ -132,7 +143,7 @@
 
 ```bash
 npm ci          # 安裝套件 (Node 版本見 .nvmrc)
-npm run dev     # http://localhost:5173/portfolio_dashboard/
+npm run dev     # http://localhost:5173/
 npm run lint
 npm run build
 ```

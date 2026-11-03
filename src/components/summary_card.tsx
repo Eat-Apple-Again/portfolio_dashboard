@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { fmt_money, fmt_pct, fmt_price, fmt_signed_money, pnl_color } from '../lib/format'
-import { SECTION_TYPES } from '../lib/portfolio'
-import type { Portfolio } from '../types'
+import { INVEST_TYPES, SECTION_TYPES } from '../lib/portfolio'
+import type { InvestType, Portfolio } from '../types'
+import { AllocationSheet } from './allocation_sheet'
 import { SummaryInfo } from './info_content'
 import { SECTION_META } from './section_meta'
 
@@ -11,6 +13,7 @@ const FX_SOURCE_LABEL = { manual: '手動', live: '即時', sheet: '試算表', 
 
 export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: boolean }) {
   const { totals } = portfolio
+  const [open_type, set_open_type] = useState<InvestType | null>(null)
   const total = totals.value_twd
   const emergency = portfolio.accounts
     .filter((a) => a.account.note.includes(EMERGENCY_TAG))
@@ -51,15 +54,34 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
             ))}
           </div>
           <ul className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm ${emergency > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}>
-            {parts.map((p) => (
-              <li key={p.key} className="flex items-center gap-2" title={fmt_money(p.value, 'TWD', hide)}>
-                <span className={`size-2 rounded-full ${p.dot}`} />
-                <span className="text-slate-300">{p.label}</span>
-                <span className="ml-auto tabular-nums text-slate-400 sm:ml-0">
-                  {fmt_pct(p.value / total, false)}
-                </span>
-              </li>
-            ))}
+            {parts.map((p) => {
+              const content = (
+                <>
+                  <span className={`size-2 rounded-full ${p.dot}`} />
+                  <span className="text-slate-300">{p.label}</span>
+                  <span className="ml-auto tabular-nums text-slate-400 sm:ml-0">
+                    {fmt_pct(p.value / total, false)}
+                  </span>
+                </>
+              )
+              const invest = INVEST_TYPES.find((t) => t === p.key)
+              return (
+                <li key={p.key} title={fmt_money(p.value, 'TWD', hide)}>
+                  {invest ? (
+                    <button
+                      type="button"
+                      onClick={() => set_open_type(invest)}
+                      className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 text-left hover:bg-slate-800"
+                    >
+                      {content}
+                      <span className="text-slate-600">›</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">{content}</div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </>
       )}
@@ -68,6 +90,10 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
         <p className="mt-3 text-xs text-slate-500">
           USD/TWD {fmt_price(portfolio.fx_rate)} ({FX_SOURCE_LABEL[portfolio.fx_source]})
         </p>
+      )}
+
+      {open_type && (
+        <AllocationSheet portfolio={portfolio} type={open_type} hide={hide} on_close={() => set_open_type(null)} />
       )}
     </section>
   )
