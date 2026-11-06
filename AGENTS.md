@@ -53,10 +53,9 @@
 
 **使用者操作：**
 1. repo 右上角 **Fork** → Create fork
-2. repo 名稱若不是 `portfolio_dashboard`，修改 [vite.config.ts](vite.config.ts) 的 `base` 為 `/<repo 名稱>/` 並 commit
-3. **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**
-4. **Actions** 分頁 → 「I understand my workflows, go ahead and enable them」 (fork 預設停用 Actions)
-5. 左側 **Deploy to GitHub Pages** → **Run workflow** → Branch: `main` → Run workflow
+2. **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**
+3. **Actions** 分頁 → 「I understand my workflows, go ahead and enable them」 (fork 預設停用 Actions)
+4. 左側 **Deploy to GitHub Pages** → **Run workflow** → Branch: `main` → Run workflow
 
 **驗收截圖**：
 - Settings → Pages 畫面
@@ -70,7 +69,7 @@
 | 狀況 | 原因 |
 |---|---|
 | 網站 404 | Source 不是 GitHub Actions，或 workflow 還沒跑完 |
-| 網站空白、console 顯示 JS 404 | `vite.config.ts` 的 `base` 與 repo 名稱不符 |
+| 網站空白、console 顯示 JS 404 | `vite.config.ts` 的 `base` 被改掉 (應為 `'./'`) |
 | deploy 步驟失敗：`Get Pages site failed` | 尚未在 Settings → Pages 選 GitHub Actions |
 
 ### Step 3：建立試算表與分頁
@@ -221,6 +220,7 @@ accounts:            # 起始日的現金
     broker: "此帳戶是哪個 holdings.account 的固定交割帳戶；每個持股帳戶最多一個"
     group: "持股帳戶名稱 = 該部位待投入現金；其他名稱 = 獨立儲備；空白 = 不列入投資範圍"
     note: "含「緊急預備金」時，總覽資產分布會單獨列出"
+    cash_split: "總覽現金 = 待投入 (invest_bucket 非 null) + 緊急預備金 (note) + 其他現金；待投入依 bucket 所屬持股帳戶的 holdings.type 分市場，同市場合併"
 
 trades:              # 由 App / API 寫入
   columns: [id, trade_date, account, action, symbol, quantity, price, fee, tax, amount, cash_account, settle_date, note, created_at]

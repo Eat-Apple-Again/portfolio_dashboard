@@ -164,11 +164,26 @@ export interface AccountGroup {
 export type InvestType = 'TW_STOCK' | 'US_STOCK' | 'CRYPTO'
 export type SectionType = InvestType | 'CASH'
 
+/** Cash waiting to be invested, per market (all its holding accounts merged) or standalone reserve */
+export interface InvestCash {
+  /** Market type, or the reserve's group name */
+  bucket: string
+  /** Market of the holding account; null for a standalone reserve */
+  type: InvestType | null
+  accounts: AccountBalance[]
+  value_twd: number
+}
+
 export interface Portfolio {
   fx_rate: number | null
   fx_source: 'manual' | 'live' | 'sheet' | 'none'
   groups: AccountGroup[]
   accounts: AccountBalance[]
+  /** Available cash split by purpose; sums to totals.by_type.CASH */
+  cash_split: { invest: number; other: number; emergency: number }
+  /** Accounts behind cash_split.other / emergency */
+  cash_accounts: { other: AccountBalance[]; emergency: AccountBalance[] }
+  invest_cash: InvestCash[]
   totals: {
     value_twd: number
     invested_cost_twd: number

@@ -4,6 +4,7 @@ import type {
   AccountGroup,
   CashEntry,
   Holding,
+  InvestCash,
   InvestType,
   Portfolio,
   Position,
@@ -313,6 +314,7 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
   }
 
   const groups = build_groups(data.holdings, invested_positions(sections), accounts)
+  const { cash_split, cash_accounts, invest_cash } = split_cash(data.holdings, accounts)
 
   const invested = INVEST_TYPES.flatMap((t) => sections[t])
   const invested_cost_twd = invested.reduce((s, p) => s + (p.cost_twd ?? 0), 0)
@@ -324,6 +326,9 @@ export function build_portfolio(data: Omit<SheetData, 'quotes' | 'updated_at'>, 
     groups,
     // Bank accounts only; broker / exchange cash is shown inside its group
     accounts: accounts.filter((a) => !is_broker_cash(a)),
+    cash_split,
+    cash_accounts,
+    invest_cash,
     totals: {
       value_twd: Object.values(by_type).reduce((s, v) => s + v, 0),
       invested_cost_twd,
@@ -376,6 +381,54 @@ function build_groups(holdings: Holding[], positions: Position[], accounts: Acco
 
   for (const g of groups.values()) g.positions.sort((a, b) => (b.value_twd ?? 0) - (a.value_twd ?? 0))
   return [...groups.values()].filter((g) => g.positions.length > 0 || g.cash.length > 0)
+}
+
+// accounts.note containing this marks an emergency fund
+export const EMERGENCY_TAG = '緊急預備金'
+
+const MARKET_ORDER: (InvestType | null)[] = ['TW_STOCK', 'US_STOCK', 'CRYPTO', null]
+
+/**
+ * Splits available cash into waiting-to-invest (any investment bucket), emergency fund and the rest.
+ * A bucket's market comes from the holdings in that account; other bucket names are standalone reserves.
+ */
+function split_cash(holdings: Holding[], accounts: AccountBalance[]) {
+  const market = new Map<string, InvestType>()
+  for (const h of holdings) {
+    if ((INVEST_TYPES as string[]).includes(h.type) && h.account && !market.has(h.account)) {
+      market.set(h.account, h.type as InvestType)
+    }
+  }
+
+  const cash_split = { invest: 0, other: 0, emergency: 0 }
+  const cash_accounts: Portfolio['cash_accounts'] = { other: [], emergency: [] }
+  const buckets = new Map<string, InvestCash>()
+  for (const a of accounts) {
+    const v = a.available_twd ?? 0
+    const bucket = invest_bucket(a.account)
+    if (a.account.note.includes(EMERGENCY_TAG)) {
+      cash_split.emergency += v
+      cash_accounts.emergency.push(a)
+    } else if (bucket == null) {
+      cash_split.other += v
+      cash_accounts.other.push(a)
+    } else {
+      cash_split.invest += v
+      // Buckets of the same market (e.g. two US brokers) merge into one
+      const type = market.get(bucket) ?? null
+      const key = type ?? bucket
+      let b = buckets.get(key)
+      if (!b) {
+        b = { bucket: key, type, accounts: [], value_twd: 0 }
+        buckets.set(key, b)
+      }
+      b.accounts.push(a)
+      b.value_twd += v
+    }
+  }
+
+  const invest_cash = [...buckets.values()].sort((x, y) => MARKET_ORDER.indexOf(x.type) - MARKET_ORDER.indexOf(y.type))
+  return { cash_split, cash_accounts, invest_cash }
 }
 
 /**

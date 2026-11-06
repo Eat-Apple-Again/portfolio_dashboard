@@ -1,33 +1,36 @@
 import { useState } from 'react'
 import { fmt_money, fmt_pct, fmt_price, fmt_signed_money, pnl_color } from '../lib/format'
-import { INVEST_TYPES, SECTION_TYPES } from '../lib/portfolio'
+import { EMERGENCY_TAG, INVEST_TYPES } from '../lib/portfolio'
 import type { InvestType, Portfolio } from '../types'
 import { AllocationSheet } from './allocation_sheet'
+import { CashListSheet } from './cash_list_sheet'
 import { SummaryInfo } from './info_content'
+import { InvestCashSheet } from './invest_cash_sheet'
 import { SECTION_META } from './section_meta'
 
-// accounts.note containing this marks an emergency fund, shown as its own slice at the end
-const EMERGENCY_TAG = '緊急預備金'
+const INVEST_CASH = 'INVEST_CASH'
+const OTHER_CASH = 'OTHER_CASH'
+const EMERGENCY = 'EMERGENCY'
 
 const FX_SOURCE_LABEL = { manual: '手動', live: '即時', sheet: '試算表', none: '' }
 
 export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: boolean }) {
   const { totals } = portfolio
-  const [open_type, set_open_type] = useState<InvestType | null>(null)
+  const [open_type, set_open_type] = useState<string | null>(null)
   const total = totals.value_twd
-  const emergency = portfolio.accounts
-    .filter((a) => a.account.note.includes(EMERGENCY_TAG))
-    .reduce((s, a) => s + (a.available_twd ?? 0), 0)
+  const { invest, other, emergency } = portfolio.cash_split
   const parts = [
-    ...SECTION_TYPES.map((t) => ({
+    ...INVEST_TYPES.map((t) => ({
       key: t as string,
       label: SECTION_META[t].label,
       bar: SECTION_META[t].bar,
       dot: SECTION_META[t].dot,
-      value: t === 'CASH' ? totals.by_type[t] - emergency : totals.by_type[t],
+      value: totals.by_type[t],
     })),
+    { key: INVEST_CASH, label: '待投入', bar: 'bg-emerald-400', dot: 'bg-emerald-400', value: invest },
+    { key: OTHER_CASH, label: '其他現金', hint: '信用卡費、預房租...', bar: 'bg-slate-400', dot: 'bg-slate-400', value: other },
     ...(emergency > 0
-      ? [{ key: 'EMERGENCY', label: EMERGENCY_TAG, bar: 'bg-slate-600', dot: 'bg-slate-600', value: emergency }]
+      ? [{ key: EMERGENCY, label: EMERGENCY_TAG, bar: 'bg-slate-600', dot: 'bg-slate-600', value: emergency }]
       : []),
   ]
 
@@ -53,32 +56,30 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
               <div key={p.key} className={p.bar} style={{ width: `${(Math.max(0, p.value) / total) * 100}%` }} />
             ))}
           </div>
-          <ul className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm ${emergency > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}>
+          <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3 xl:flex xl:justify-between">
             {parts.map((p) => {
               const content = (
                 <>
                   <span className={`size-2 rounded-full ${p.dot}`} />
-                  <span className="text-slate-300">{p.label}</span>
+                  <span className="text-slate-300">
+                    {p.label}
+                    {'hint' in p && <span className="text-xs text-slate-500"> ({p.hint})</span>}
+                  </span>
                   <span className="ml-auto tabular-nums text-slate-400 sm:ml-0">
                     {fmt_pct(p.value / total, false)}
                   </span>
                 </>
               )
-              const invest = INVEST_TYPES.find((t) => t === p.key)
               return (
                 <li key={p.key} title={fmt_money(p.value, 'TWD', hide)}>
-                  {invest ? (
-                    <button
-                      type="button"
-                      onClick={() => set_open_type(invest)}
-                      className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 text-left hover:bg-slate-800"
-                    >
-                      {content}
-                      <span className="text-slate-600">›</span>
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">{content}</div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => set_open_type(p.key)}
+                    className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 text-left hover:bg-slate-800 xl:w-auto"
+                  >
+                    {content}
+                    <span className="text-slate-600">›</span>
+                  </button>
                 </li>
               )
             })}
@@ -92,8 +93,24 @@ export function SummaryCard({ portfolio, hide }: { portfolio: Portfolio; hide: b
         </p>
       )}
 
-      {open_type && (
-        <AllocationSheet portfolio={portfolio} type={open_type} hide={hide} on_close={() => set_open_type(null)} />
+      {open_type === INVEST_CASH && (
+        <InvestCashSheet portfolio={portfolio} hide={hide} on_close={() => set_open_type(null)} />
+      )}
+      {(open_type === OTHER_CASH || open_type === EMERGENCY) && (
+        <CashListSheet
+          title={open_type === EMERGENCY ? EMERGENCY_TAG : '其他現金'}
+          accounts={portfolio.cash_accounts[open_type === EMERGENCY ? 'emergency' : 'other']}
+          hide={hide}
+          on_close={() => set_open_type(null)}
+        />
+      )}
+      {INVEST_TYPES.includes(open_type as InvestType) && (
+        <AllocationSheet
+          portfolio={portfolio}
+          type={open_type as InvestType}
+          hide={hide}
+          on_close={() => set_open_type(null)}
+        />
       )}
     </section>
   )
