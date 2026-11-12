@@ -91,7 +91,9 @@ function Dashboard({
     ? (portfolio?.groups.flatMap((g) => g.positions).find((p) => position_key(p) === selected_key) ?? null)
     : null
   const account = selected_account
-    ? (portfolio?.accounts.find((a) => a.account.account === selected_account) ?? null)
+    ? ([...(portfolio?.accounts ?? []), ...(portfolio?.groups.flatMap((g) => g.cash) ?? [])].find(
+        (a) => a.account.account === selected_account,
+      ) ?? null)
     : null
 
   const toggle_hide = () => {
@@ -212,6 +214,7 @@ function Dashboard({
                   group={g}
                   hide={hide}
                   on_select={(p) => set_selected_key(position_key(p))}
+                  on_select_cash={(a) => set_selected_account(a.account.account)}
                 />
               ))}
             </div>

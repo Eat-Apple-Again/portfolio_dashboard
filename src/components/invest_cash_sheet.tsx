@@ -1,4 +1,5 @@
 import { fmt_money, fmt_pct } from '../lib/format'
+import { cash_currency_label } from '../lib/portfolio'
 import type { AccountBalance, Portfolio } from '../types'
 import { SECTION_META } from './section_meta'
 import { Sheet, SheetHeader } from './sheet'
@@ -63,7 +64,7 @@ export function InvestCashSheet({ portfolio, hide, on_close }: Props) {
 
 function AccountRow({ a, hide }: { a: AccountBalance; hide: boolean }) {
   const cur = a.account.currency
-  const label = a.account.type === 'EXCHANGE' ? 'USDT' : cur
+  const label = cash_currency_label(a.account)
   return (
     <li className="flex justify-between gap-3 py-1.5 text-xs">
       <span className="truncate text-slate-400">{a.account.account}</span>

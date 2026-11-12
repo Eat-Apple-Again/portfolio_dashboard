@@ -374,7 +374,7 @@ function build_groups(holdings: Holding[], positions: Position[], accounts: Acco
   }
   for (const a of accounts) {
     if (!is_broker_cash(a)) continue
-    const g = ensure(a.account.broker || a.account.account)
+    const g = ensure(broker_home(a.account))
     g.cash.push(a)
     g.value_twd += a.available_twd ?? 0
   }
@@ -432,12 +432,25 @@ function split_cash(holdings: Holding[], accounts: AccountBalance[]) {
 }
 
 /**
+ * Holding account that broker / exchange cash is shown with: `broker`, then `group`
+ * (e.g. a TWD on-ramp exchange feeding another exchange), then its own name
+ */
+function broker_home(a: Account): string {
+  return a.broker || a.group || a.account
+}
+
+/** Currency shown for an account's cash; exchange USD is held as USDT */
+export function cash_currency_label(a: Account): string {
+  return a.type === 'EXCHANGE' && a.currency === 'USD' ? 'USDT' : a.currency
+}
+
+/**
  * Which investment bucket an account's cash belongs to, or null when it is outside the investment scope.
  * Broker / exchange cash and settlement accounts join their broker; otherwise `group` decides
  * (a holding account name = cash waiting to be invested there, any other name = a standalone reserve).
  */
 export function invest_bucket(a: Account): string | null {
-  if (a.type === 'BROKER' || a.type === 'EXCHANGE') return a.broker || a.account
+  if (a.type === 'BROKER' || a.type === 'EXCHANGE') return broker_home(a)
   if (a.broker) return a.broker
   return a.group || null
 }

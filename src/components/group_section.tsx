@@ -1,4 +1,5 @@
 import { fmt_money, fmt_pct, fmt_price, fmt_qty, fmt_signed_money, pnl_color } from '../lib/format'
+import { cash_currency_label } from '../lib/portfolio'
 import type { AccountBalance, AccountGroup, Position, SectionType } from '../types'
 import { SECTION_META } from './section_meta'
 import { SectionCard } from './section_card'
@@ -7,6 +8,7 @@ interface Props {
   group: AccountGroup
   hide: boolean
   on_select: (p: Position) => void
+  on_select_cash: (a: AccountBalance) => void
 }
 
 // Container query: table columns only when the card itself is wide enough
@@ -14,7 +16,7 @@ const GRID = 'grid grid-cols-[1fr_auto] @2xl:grid-cols-[1.6fr_repeat(6,1fr)] gap
 const EPS = 1e-9
 
 /** One brokerage / exchange / wallet: its positions followed by its cash */
-export function GroupSection({ group, hide, on_select }: Props) {
+export function GroupSection({ group, hide, on_select, on_select_cash }: Props) {
   const types = [...new Set(group.positions.map((p) => p.holding.type as SectionType))]
   const currencies = [...new Set(group.positions.map((p) => p.holding.currency))]
   const dot = SECTION_META[types[0] ?? 'CASH'].dot
@@ -66,7 +68,7 @@ export function GroupSection({ group, hide, on_select }: Props) {
           </li>
         ))}
         {group.cash.map((a) => (
-          <CashRow key={a.account.account} a={a} hide={hide} />
+          <CashRow key={a.account.account} a={a} group={group.account} hide={hide} on_select={on_select_cash} />
         ))}
       </ul>
     </SectionCard>
@@ -98,23 +100,39 @@ function PositionCells({ p, hide }: { p: Position; hide: boolean }) {
   )
 }
 
-/** Broker / exchange cash, e.g. brokerage USD cash or exchange USDT */
-function CashRow({ a, hide }: { a: AccountBalance; hide: boolean }) {
+interface CashRowProps {
+  a: AccountBalance
+  group: string
+  hide: boolean
+  on_select: (a: AccountBalance) => void
+}
+
+/** Broker / exchange cash, e.g. brokerage USD cash or exchange USDT; opens its statement */
+function CashRow({ a, group, hide, on_select }: CashRowProps) {
   const cur = a.account.currency
-  const label = a.account.type === 'EXCHANGE' ? 'USDT' : `現金 (${cur})`
+  const unit = cash_currency_label(a.account)
+  const base = unit === 'USDT' ? unit : `現金 (${unit})`
+  // Cash from another account (e.g. a TWD on-ramp exchange) is named explicitly
+  const label = a.account.account === group ? base : `${a.account.account} · ${base}`
   const pending = Math.abs(a.pending) > EPS
 
   return (
-    <li className={`${GRID} items-center px-5 py-2`}>
-      <div className="min-w-0">
-        <p className="truncate font-medium text-slate-300">{label}</p>
-        {pending && (
-          <p className="truncate text-xs text-amber-400">
-            待交割 {fmt_signed_money(a.pending, cur, hide)}・可用 {fmt_money(a.available, cur, hide)}
-          </p>
-        )}
-      </div>
-      <p className="text-right tabular-nums @2xl:col-start-6">{fmt_money(a.balance, cur, hide)}</p>
+    <li>
+      <button
+        type="button"
+        onClick={() => on_select(a)}
+        className={`${GRID} w-full items-center px-5 py-2 text-left hover:bg-slate-800/60 active:bg-slate-800`}
+      >
+        <div className="min-w-0">
+          <p className="truncate font-medium text-slate-300">{label}</p>
+          {pending && (
+            <p className="truncate text-xs text-amber-400">
+              待交割 {fmt_signed_money(a.pending, cur, hide)}・可用 {fmt_money(a.available, cur, hide)}
+            </p>
+          )}
+        </div>
+        <p className="text-right tabular-nums @2xl:col-start-6">{fmt_money(a.balance, cur, hide)}</p>
+      </button>
     </li>
   )
 }

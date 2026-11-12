@@ -42,6 +42,7 @@
 | 帳戶性質 | `type` | `broker` | `group` |
 |---|---|---|---|
 | 券商 / 交易所內的現金 | `BROKER` / `EXCHANGE` | 空白 (帳戶名稱與 `holdings.account` 相同) 或填持股帳戶名稱 | 空白 |
+| 台幣入金用的交易所 (換成 USDT 再轉到別的交易所) | `EXCHANGE`，`currency` = `TWD` | 空白 (填了會搶走該交易所的交割) | 目的交易所名稱 |
 | 某券商的交割銀行帳戶 | `BANK` | 該持股帳戶名稱 (每個持股帳戶只能有一個) | 空白 |
 | 等著投入某部位的錢 | `BANK` | 空白 | 該持股帳戶名稱 |
 | 尚未決定用途的投資儲備 | `BANK` | 空白 | 儲備名稱，如 `總儲備` |
@@ -177,7 +178,7 @@ fetch_sheet (src/lib/api.ts)
 ```yaml
 invest_bucket(account):          # src/lib/portfolio.ts — 決定走勢與試算的投資範圍
   - if: type in [BROKER, EXCHANGE]
-    then: broker || account
+    then: broker || group || account   # 也決定總覽中現金顯示在哪個券商 / 交易所底下
   - if: broker
     then: broker
   - else: group || null          # null = 不屬於投資範圍
